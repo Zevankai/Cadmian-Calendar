@@ -163,6 +163,12 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
         textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
       }}>Settings</h2>
 
+      {/* Save/Cancel Buttons at Top */}
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+        <button onClick={() => onSave(localConfig)} className="btn-primary" style={{ flex: 1 }}>Save Changes</button>
+        <button onClick={onCancel} className="btn-secondary">Cancel</button>
+      </div>
+
       {/* --- ARCHIVING --- */}
       <div style={{
         background: 'rgba(255, 255, 255, 0.08)',
@@ -332,13 +338,13 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
 
       {/* --- GLOBAL CONFIG --- */}
       <h3 style={{ fontSize: '0.9rem', marginTop: '10px', marginBottom: '5px' }}>World Config</h3>
-      <div style={{ marginBottom: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+      <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
         <label>
-          <div style={{fontSize: '0.8rem', color: '#aaa'}}>Year Suffix</div>
+          <div style={{fontSize: '0.8rem', color: '#aaa', marginBottom: '4px'}}>Year Suffix</div>
           <input className="settings-input" value={localConfig.yearName} onChange={e => setLocalConfig({...localConfig, yearName: e.target.value})} />
         </label>
         <label>
-          <div style={{fontSize: '0.8rem', color: '#aaa'}}>Moon Cycle</div>
+          <div style={{fontSize: '0.8rem', color: '#aaa', marginBottom: '4px'}}>Moon Cycle</div>
           <input type="number" className="settings-input" value={localConfig.moonCycle} onChange={e => setLocalConfig({...localConfig, moonCycle: parseFloat(e.target.value)})} />
         </label>
       </div>
@@ -376,11 +382,11 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
       </div>
 
       <h3 style={{fontSize: '0.9rem', marginTop: '20px'}}>Months</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {localConfig.months.map((month, idx) => (
-          <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 0.4fr 0.8fr auto', gap: '5px', alignItems: 'center' }}>
-            <input className="settings-input" value={month.name} onChange={(e) => handleMonthChange(idx, 'name', e.target.value)} />
-            <input className="settings-input" type="number" value={month.days} onChange={(e) => handleMonthChange(idx, 'days', parseInt(e.target.value))} />
+          <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 70px 100px 40px', gap: '8px', alignItems: 'center' }}>
+            <input className="settings-input" placeholder="Name" value={month.name} onChange={(e) => handleMonthChange(idx, 'name', e.target.value)} />
+            <input className="settings-input" placeholder="Days" type="number" value={month.days} onChange={(e) => handleMonthChange(idx, 'days', parseInt(e.target.value))} />
             <select className="settings-input" value={month.season} onChange={(e) => handleMonthChange(idx, 'season', e.target.value as SeasonName)}>
               <option value="Winter">Winter</option>
               <option value="Spring">Spring</option>
@@ -391,11 +397,6 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
           </div>
         ))}
         <button onClick={addMonth} className="btn-secondary">+ Add Month</button>
-      </div>
-
-      <div style={{ marginTop: '20px', display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <button onClick={() => onSave(localConfig)} className="btn-primary" style={{ flex: 1 }}>Save Changes</button>
-        <button onClick={onCancel} className="btn-secondary">Cancel</button>
       </div>
 
       {/* DANGER ZONE */}
