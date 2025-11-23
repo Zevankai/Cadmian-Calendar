@@ -1,27 +1,29 @@
 import { useEffect, useState } from 'react';
 import OBR from '@owlbear-rodeo/sdk';
 import { v4 as uuidv4 } from 'uuid';
-import { 
-  METADATA_KEY_CONFIG, 
-  METADATA_PREFIX_LOGS // <--- We use the prefix now
+import {
+  METADATA_KEY_CONFIG,
+  METADATA_PREFIX_LOGS // <--- Legacy, for migration only
 } from '../types';
 
-import type { 
-  CalendarConfig, 
-  CalendarLogs, 
-  CalendarLog, 
-  DateTimeState, 
-  EventCategory 
+import type {
+  CalendarConfig,
+  CalendarLogs,
+  CalendarLog,
+  DateTimeState,
+  EventCategory
 } from '../types';
 
 import { DEFAULT_CONFIG } from '../defaultData';
 import { calculateAdvancedDate } from '../utils/calendarMath';
 import { generateWeather } from '../utils/weatherLogic';
-
-// HELPER: Generates the specific key for a month (e.g. "...logs.1492-0")
-const getBucketKey = (year: number, monthIndex: number) => {
-  return `${METADATA_PREFIX_LOGS}.${year}-${monthIndex}`;
-};
+import {
+  readConfig,
+  writeConfig,
+  readAllLogs,
+  writeLogs,
+  readLogs
+} from '../utils/itemStorage';
 
 export const useCalendar = () => {
   const [config, setConfig] = useState<CalendarConfig | null>(null);
@@ -31,7 +33,7 @@ export const useCalendar = () => {
 
   useEffect(() => {
     let active = true;
-    let unsubscribeMetadata: (() => void) | undefined;
+    let unsubscribeItems: (() => void) | undefined;
 
     const setup = async () => {
       await new Promise<void>(resolve => OBR.onReady(() => resolve()));
@@ -40,27 +42,58 @@ export const useCalendar = () => {
       const playerRole = await OBR.player.getRole();
       if (active) setRole(playerRole);
 
-      // 1. Get ALL Metadata
-      const metadata = await OBR.room.getMetadata();
-      
-      // 2. Handle Config
-      let loadedConfig = metadata[METADATA_KEY_CONFIG] as CalendarConfig;
-      if (!loadedConfig && playerRole === 'GM') {
-        loadedConfig = DEFAULT_CONFIG;
-        await OBR.room.setMetadata({ [METADATA_KEY_CONFIG]: DEFAULT_CONFIG });
-      }
+      // 1. Try reading from item metadata
+      let loadedConfig = await readConfig();
+      let allLogs = await readAllLogs();
 
-      // 3. Handle Logs (Bucketing Strategy)
-      // Scan for any key that starts with our prefix
-      const allLogs: CalendarLogs = [];
-      Object.keys(metadata).forEach(key => {
-        if (key.startsWith(METADATA_PREFIX_LOGS)) {
-          const bucketLogs = metadata[key] as CalendarLogs;
-          if (Array.isArray(bucketLogs)) {
-            allLogs.push(...bucketLogs);
+      // 2. Migration: If no item config found, check room metadata
+      if (!loadedConfig && playerRole === 'GM') {
+        const roomMetadata = await OBR.room.getMetadata();
+        const roomConfig = roomMetadata[METADATA_KEY_CONFIG] as CalendarConfig | undefined;
+
+        if (roomConfig) {
+          // Migrate config from room to item
+          console.log('Migrating config from room metadata to item metadata...');
+          await writeConfig(roomConfig);
+          loadedConfig = roomConfig;
+
+          // Migrate logs from room to items
+          console.log('Migrating logs from room metadata to item metadata...');
+          const roomLogs: CalendarLogs = [];
+          Object.keys(roomMetadata).forEach(key => {
+            if (key.startsWith(METADATA_PREFIX_LOGS)) {
+              const bucketLogs = roomMetadata[key] as CalendarLogs;
+              if (Array.isArray(bucketLogs)) {
+                roomLogs.push(...bucketLogs);
+              }
+            }
+          });
+
+          // Group logs by year/month and write to separate items
+          const buckets = new Map<string, CalendarLogs>();
+          roomLogs.forEach(log => {
+            const key = `${log.date.year}-${log.date.monthIndex}`;
+            if (!buckets.has(key)) {
+              buckets.set(key, []);
+            }
+            buckets.get(key)!.push(log);
+          });
+
+          for (const [key, bucketLogs] of buckets.entries()) {
+            const [yearStr, monthStr] = key.split('-');
+            const year = parseInt(yearStr);
+            const monthIndex = parseInt(monthStr);
+            await writeLogs(year, monthIndex, bucketLogs);
           }
+
+          allLogs = roomLogs;
+          console.log('Migration complete!');
+        } else {
+          // No existing data, create new
+          loadedConfig = DEFAULT_CONFIG;
+          await writeConfig(DEFAULT_CONFIG);
         }
-      });
+      }
 
       if (active) {
         setConfig(loadedConfig || DEFAULT_CONFIG);
@@ -68,53 +101,29 @@ export const useCalendar = () => {
         setReady(true);
       }
 
-      // 4. Register Listener
-      unsubscribeMetadata = OBR.room.onMetadataChange((changes) => {
+      // 3. Listen for scene item changes (our calendar items)
+      unsubscribeItems = OBR.scene.items.onChange(async (items) => {
         if (!active) return;
 
-        // A. Config Update?
-        if (changes[METADATA_KEY_CONFIG]) {
-          setConfig(changes[METADATA_KEY_CONFIG] as CalendarConfig);
-        }
+        // Check if any calendar items changed
+        const calendarItems = items.filter(item =>
+          item.id.startsWith('com.username.calendar-')
+        );
 
-        // B. Logs Update?
-        // Check if ANY changed key matches our prefix
-        const logKeysChanged = Object.keys(changes).some(k => k.startsWith(METADATA_PREFIX_LOGS));
-        
-        if (logKeysChanged) {
-          // Re-sync local logs state from the changes
-          setLogs((prevLogs) => {
-             // Identify which buckets changed
-             const changedBuckets = Object.keys(changes).filter(k => k.startsWith(METADATA_PREFIX_LOGS));
-             
-             let newLogsState = [...prevLogs];
+        if (calendarItems.length === 0) return;
 
-             changedBuckets.forEach(key => {
-                // Extract Year/Month from key to remove old data
-                const suffix = key.replace(`${METADATA_PREFIX_LOGS}.`, '');
-                const [yStr, mStr] = suffix.split('-');
-                const y = parseInt(yStr);
-                const m = parseInt(mStr);
+        // Reload config and logs when calendar items change
+        const newConfig = await readConfig();
+        const newLogs = await readAllLogs();
 
-                // Remove old logs for this bucket
-                newLogsState = newLogsState.filter(l => !(l.date.year === y && l.date.monthIndex === m));
-
-                // Add new logs from the update (if not undefined/deleted)
-                const newBucketData = changes[key] as CalendarLogs;
-                if (newBucketData && Array.isArray(newBucketData)) {
-                  newLogsState.push(...newBucketData);
-                }
-             });
-
-             return newLogsState;
-          });
-        }
+        if (newConfig) setConfig(newConfig);
+        setLogs(newLogs);
       });
     };
 
     if (OBR.isAvailable) setup();
 
-    return () => { active = false; if (unsubscribeMetadata) unsubscribeMetadata(); };
+    return () => { active = false; if (unsubscribeItems) unsubscribeItems(); };
   }, []);
 
   // --- ACTIONS ---
@@ -122,17 +131,17 @@ export const useCalendar = () => {
   const updateConfig = async (newConfig: CalendarConfig) => {
     if (role !== 'GM') return;
     setConfig(newConfig);
-    await OBR.room.setMetadata({ [METADATA_KEY_CONFIG]: newConfig });
+    await writeConfig(newConfig);
   };
 
   const updateTime = async (minutesToAdd: number) => {
     if (role !== 'GM' || !config) return;
     const newDate = calculateAdvancedDate(config, config.currentDate, minutesToAdd);
-    
+
     let newWeather = config.currentWeather;
     const hourDiff = Math.abs(newDate.hour - config.currentWeather.lastUpdatedHour);
     const isNewDay = newDate.day !== config.currentDate.day;
-    
+
     if (hourDiff >= 2 || isNewDay) {
       const season = config.months[newDate.monthIndex].season;
       const weatherRoll = generateWeather(season, config.activeBiome || 'Temperate');
@@ -141,24 +150,24 @@ export const useCalendar = () => {
 
     const updatedConfig = { ...config, currentDate: newDate, currentWeather: newWeather };
     setConfig(updatedConfig);
-    await OBR.room.setMetadata({ [METADATA_KEY_CONFIG]: updatedConfig });
+    await writeConfig(updatedConfig);
   };
 
   const setExactDate = async (newDateState: Partial<DateTimeState>) => {
     if (role !== 'GM' || !config) return;
     const updatedConfig = { ...config, currentDate: { ...config.currentDate, ...newDateState } };
     setConfig(updatedConfig);
-    await OBR.room.setMetadata({ [METADATA_KEY_CONFIG]: updatedConfig });
+    await writeConfig(updatedConfig);
   }
 
   const updateWeather = async (weatherCondition: string, temperature?: number) => {
     if (role !== 'GM' || !config) return;
     const updatedConfig = { ...config, currentWeather: { ...config.currentWeather, currentCondition: weatherCondition, temperature: temperature ?? config.currentWeather.temperature } };
     setConfig(updatedConfig);
-    await OBR.room.setMetadata({ [METADATA_KEY_CONFIG]: updatedConfig });
+    await writeConfig(updatedConfig);
   }
 
-  // --- THE CRITICAL PART: ADDING LOGS TO SPECIFIC BUCKETS ---
+  // --- ADDING LOGS TO ITEM-BASED STORAGE ---
   const addLog = async (title: string, content: string, category: EventCategory, date: DateTimeState, isGmOnly: boolean) => {
     if (role !== 'GM') return;
 
@@ -168,18 +177,15 @@ export const useCalendar = () => {
       title, content, category, authorId: OBR.player.id, isGmOnly, timestamp: Date.now()
     };
 
-    // 1. Determine Bucket Key (e.g. logs.1492-0)
-    const bucketKey = getBucketKey(date.year, date.monthIndex);
+    // 1. Get existing logs for this month from item metadata
+    const existingBucketLogs = await readLogs(date.year, date.monthIndex);
 
-    // 2. Filter existing logs to find ones belonging to THIS bucket only
-    const existingBucketLogs = logs.filter(l => 
-      l.date.year === date.year && l.date.monthIndex === date.monthIndex
-    );
-
-    // 3. Update only that bucket
+    // 2. Add new log to the bucket
     const newBucketLogs = [...existingBucketLogs, newLog];
-    await OBR.room.setMetadata({ [bucketKey]: newBucketLogs });
-    
+
+    // 3. Write to item metadata
+    await writeLogs(date.year, date.monthIndex, newBucketLogs);
+
     // 4. Update local state
     setLogs([...logs, newLog]);
   };
@@ -190,19 +196,16 @@ export const useCalendar = () => {
     const logToDelete = logs.find(l => l.id === logId);
     if (!logToDelete) return;
 
-    // 1. Determine Bucket Key
-    const bucketKey = getBucketKey(logToDelete.date.year, logToDelete.date.monthIndex);
+    // 1. Get existing logs for this month from item metadata
+    const existingBucketLogs = await readLogs(logToDelete.date.year, logToDelete.date.monthIndex);
 
-    // 2. Filter bucket
-    const existingBucketLogs = logs.filter(l => 
-      l.date.year === logToDelete.date.year && l.date.monthIndex === logToDelete.date.monthIndex
-    );
+    // 2. Remove the log from the bucket
     const newBucketLogs = existingBucketLogs.filter(l => l.id !== logId);
 
-    // 3. Update OBR
-    await OBR.room.setMetadata({ [bucketKey]: newBucketLogs });
+    // 3. Write to item metadata
+    await writeLogs(logToDelete.date.year, logToDelete.date.monthIndex, newBucketLogs);
 
-    // 4. Update Local
+    // 4. Update local state
     setLogs(logs.filter(l => l.id !== logId));
   };
 

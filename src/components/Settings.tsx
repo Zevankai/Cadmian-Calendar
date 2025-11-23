@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import OBR from '@owlbear-rodeo/sdk';
 import type { CalendarConfig, MonthConfig, SeasonName, BiomeType, DateTimeState, CalendarLogs } from '../types';
 import { METADATA_KEY_CONFIG, METADATA_PREFIX_LOGS } from '../types';
-import { getMonthMetadataStats, getTotalMetadataUsage, formatBytes, getUsageColor } from '../utils/metadataStats';
+import { getMonthMetadataStats, formatBytes, getUsageColor, calculateDataSize, calculateUsagePercentage } from '../utils/metadataStats';
 
 interface SettingsProps {
   config: CalendarConfig;
@@ -200,85 +200,50 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
         border: '1px solid rgba(255, 255, 255, 0.15)',
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
       }}>
-        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#a78bfa' }}>Room Metadata Usage</h3>
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#a78bfa' }}>Storage Usage (Item-Based)</h3>
         <div style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: '12px' }}>
-          <strong>Important:</strong> All metadata keys share a single 16KB total room limit.
-          Splitting events into separate month keys helps organize data, but all keys count toward the same 16KB total.
+          <strong>New:</strong> Using item metadata storage where each month gets its own 16KB storage.
+          Events are split by month, allowing virtually unlimited total storage.
         </div>
 
         {(() => {
-          // Calculate total metadata usage
-          const totalUsage = getTotalMetadataUsage(localConfig, logs);
-          const totalColor = getUsageColor(totalUsage.usagePercentage);
+          // Calculate month metadata stats
           const monthStats = getMonthMetadataStats(logs, localConfig.months.map(m => m.name));
 
           return (
             <>
-              {/* Total Usage Display */}
+              {/* Config Item Display */}
               <div style={{
-                background: `linear-gradient(135deg, ${totalColor}15 0%, ${totalColor}05 100%)`,
+                background: 'rgba(100, 108, 255, 0.1)',
                 padding: '14px',
                 borderRadius: '10px',
-                border: `2px solid ${totalColor}`,
+                border: '2px solid rgba(100, 108, 255, 0.3)',
                 marginBottom: '16px',
-                boxShadow: `0 0 20px ${totalColor}40`
+                boxShadow: '0 0 20px rgba(100, 108, 255, 0.2)'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#fff' }}>
-                    Total Room Usage
+                    Config Item
                   </div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: totalColor }}>
-                    {totalUsage.usagePercentage.toFixed(1)}%
+                  <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#a5b4fc' }}>
+                    {(() => {
+                      const configSize = calculateDataSize(localConfig);
+                      const configPercentage = calculateUsagePercentage(configSize);
+                      return `${configPercentage.toFixed(1)}% of 16 KB`;
+                    })()}
                   </div>
                 </div>
 
-                {/* Total progress bar */}
-                <div style={{
-                  width: '100%',
-                  height: '12px',
-                  background: 'rgba(0, 0, 0, 0.4)',
-                  borderRadius: '6px',
-                  overflow: 'hidden',
-                  marginBottom: '8px'
-                }}>
-                  <div style={{
-                    width: `${Math.min(totalUsage.usagePercentage, 100)}%`,
-                    height: '100%',
-                    background: `linear-gradient(90deg, ${totalColor} 0%, ${totalColor}CC 100%)`,
-                    transition: 'width 0.5s ease',
-                    boxShadow: `0 0 10px ${totalColor}80`
-                  }} />
+                <div style={{ fontSize: '0.75rem', color: '#ddd' }}>
+                  Calendar configuration stored in dedicated item
                 </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                  <span style={{ color: '#ddd' }}>
-                    Config + All Events
-                  </span>
-                  <span style={{ color: '#fff', fontWeight: '600' }}>
-                    {formatBytes(totalUsage.sizeBytes)} / 16 KB
-                  </span>
-                </div>
-
-                {totalUsage.usagePercentage > 80 && (
-                  <div style={{
-                    marginTop: '10px',
-                    padding: '8px',
-                    background: 'rgba(239, 68, 68, 0.2)',
-                    border: '1px solid #ef4444',
-                    borderRadius: '6px',
-                    fontSize: '0.75rem',
-                    color: '#fca5a5'
-                  }}>
-                    ⚠️ Warning: Approaching room metadata limit. Consider exporting and purging old events.
-                  </div>
-                )}
               </div>
 
               {/* Per-Month Breakdown */}
               {monthStats.length > 0 && (
                 <>
                   <div style={{ fontSize: '0.8rem', color: '#bbb', marginBottom: '8px', fontWeight: '600' }}>
-                    Breakdown by Month
+                    Event Items (Each month has 16KB storage)
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
                     {monthStats.map((stat, idx) => {
