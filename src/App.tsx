@@ -106,19 +106,54 @@ function App() {
         </div>
 
         {/* EVENTS SECTION */}
-        <div style={{ padding: '10px', borderTop: '1px solid #333', background: '#181818', minHeight: '200px' }}>
-          
+        <div style={{
+          padding: '16px',
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '0 0 16px 16px',
+          margin: '0 8px 8px 8px',
+          minHeight: '200px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+        }}>
+
           {/* Events Header & Add Button */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <h3 style={{ margin: 0, fontSize: '0.9rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '1px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 style={{
+              margin: 0,
+              fontSize: '0.95rem',
+              color: '#fff',
+              textTransform: 'uppercase',
+              letterSpacing: '1.5px',
+              fontWeight: 'bold',
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)'
+            }}>
                Events ({viewDate.day}/{viewDate.monthIndex + 1})
             </h3>
             {isGM && !isCreatingNote && (
-              <button 
-                onClick={() => setIsCreatingNote(true)} 
-                style={{ 
-                  background: 'transparent', border: '1px solid #444', color: '#888', 
-                  cursor: 'pointer', fontSize: '0.8rem', padding: '2px 8px', borderRadius: '10px'
+              <button
+                onClick={() => setIsCreatingNote(true)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(5px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: '#e0e0e0',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                  e.currentTarget.style.color = '#fff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.color = '#e0e0e0';
                 }}
               >
                 + Add Event

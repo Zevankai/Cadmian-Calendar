@@ -2,9 +2,9 @@ import type { CalendarLogs } from '../types';
 
 /**
  * Owlbear Rodeo metadata size limit per key (in bytes)
- * According to OBR documentation, the limit is around 5MB per key
+ * According to OBR documentation, the limit is 16KB per key
  */
-export const METADATA_SIZE_LIMIT = 5 * 1024 * 1024; // 5MB in bytes
+export const METADATA_SIZE_LIMIT = 16 * 1024; // 16KB in bytes
 
 /**
  * Calculate the approximate size of data in bytes (JSON stringified)

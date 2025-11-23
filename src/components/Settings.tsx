@@ -202,7 +202,7 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
       }}>
         <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#a78bfa' }}>Metadata Usage by Month</h3>
         <div style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: '10px' }}>
-          Each month/year stores events in a separate metadata key (5MB limit per key)
+          Each month/year stores events in a separate metadata key (16KB limit per key)
         </div>
 
         {(() => {
@@ -257,7 +257,7 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
                         {stat.usagePercentage.toFixed(2)}% used
                       </span>
                       <span style={{ color: '#aaa' }}>
-                        {formatBytes(stat.sizeBytes)} / 5 MB
+                        {formatBytes(stat.sizeBytes)} / 16 KB
                       </span>
                     </div>
                   </div>
