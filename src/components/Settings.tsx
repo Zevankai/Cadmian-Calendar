@@ -2,14 +2,16 @@ import React, { useState, useRef } from 'react';
 import OBR from '@owlbear-rodeo/sdk';
 import type { CalendarConfig, MonthConfig, SeasonName, BiomeType, DateTimeState, CalendarLogs } from '../types';
 import { METADATA_KEY_CONFIG, METADATA_PREFIX_LOGS } from '../types';
+import { getMonthMetadataStats, formatBytes, getUsageColor } from '../utils/metadataStats';
 
 interface SettingsProps {
   config: CalendarConfig;
+  logs: CalendarLogs;
   onSave: (newConfig: CalendarConfig) => void;
   onCancel: () => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ config, onSave, onCancel }) => {
+export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCancel }) => {
   const [localConfig, setLocalConfig] = useState<CalendarConfig>(JSON.parse(JSON.stringify(config)));
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -187,7 +189,85 @@ export const Settings: React.FC<SettingsProps> = ({ config, onSave, onCancel }) 
             Purge All Events (Free Space)
         </button>
       </div>
-      
+
+      {/* --- METADATA USAGE TRACKER --- */}
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.08)',
+        backdropFilter: 'blur(8px)',
+        padding: '12px',
+        borderRadius: '12px',
+        marginBottom: '1.5rem',
+        border: '1px solid rgba(255, 255, 255, 0.15)',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
+      }}>
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#a78bfa' }}>Metadata Usage by Month</h3>
+        <div style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: '10px' }}>
+          Each month/year stores events in a separate metadata key (5MB limit per key)
+        </div>
+
+        {(() => {
+          const monthStats = getMonthMetadataStats(logs, localConfig.months.map(m => m.name));
+
+          if (monthStats.length === 0) {
+            return <div style={{ color: '#888', fontStyle: 'italic', padding: '10px', textAlign: 'center' }}>
+              No events created yet
+            </div>;
+          }
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+              {monthStats.map((stat, idx) => {
+                const usageColor = getUsageColor(stat.usagePercentage);
+                return (
+                  <div key={idx} style={{
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: `1px solid ${usageColor}40`
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <div style={{ fontWeight: 'bold', color: '#fff' }}>
+                        {stat.monthName} {stat.year}
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: '#ccc' }}>
+                        {stat.eventCount} event{stat.eventCount !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: '4px' }}>
+                      {/* Progress bar */}
+                      <div style={{
+                        width: '100%',
+                        height: '6px',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        borderRadius: '3px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          width: `${Math.min(stat.usagePercentage, 100)}%`,
+                          height: '100%',
+                          background: usageColor,
+                          transition: 'width 0.3s ease'
+                        }} />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                      <span style={{ color: usageColor }}>
+                        {stat.usagePercentage.toFixed(2)}% used
+                      </span>
+                      <span style={{ color: '#aaa' }}>
+                        {formatBytes(stat.sizeBytes)} / 5 MB
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </div>
+
       {/* --- CURRENT DATE OVERRIDE --- */}
       <div style={{
         background: 'rgba(255, 255, 255, 0.08)',
