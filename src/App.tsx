@@ -54,8 +54,9 @@ function App() {
   // RENDER SETTINGS
   if (activeTab === 'settings') {
     return (
-      <Settings 
+      <Settings
         config={config}
+        logs={logs}
         onSave={(newConfig) => {
             actions.updateConfig(newConfig);
             setActiveTab('calendar');
