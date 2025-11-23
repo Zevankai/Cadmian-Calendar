@@ -8,14 +8,11 @@ export default defineConfig({
     react(),
     basicSsl()
   ],
-  // CRITICAL FOR GITHUB PAGES:
-  base: '/Cadmian-Calendar/', 
+  // REMOVED "base" property for Vercel!
   
   server: {
     open: false,
     port: 5173,
-    // FIXED: Removed 'https: true' (basicSsl plugin handles this automatically)
-    // CRITICAL FOR LOCAL DEV:
     cors: {
       origin: "*", 
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
