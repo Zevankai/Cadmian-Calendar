@@ -54,7 +54,7 @@ async function createCalendarItem(id: string, name: string): Promise<Item> {
  * Get or create the calendar config item
  */
 export async function getOrCreateConfigItem(): Promise<Item> {
-  const items = await OBR.scene.items.getItems([CALENDAR_CONFIG_ITEM_ID]);
+  const items = await OBR.scene.items.getItems((item) => item.id === CALENDAR_CONFIG_ITEM_ID);
 
   if (items.length > 0) {
     return items[0];
@@ -68,7 +68,7 @@ export async function getOrCreateConfigItem(): Promise<Item> {
  */
 export async function getOrCreateLogsItem(year: number, monthIndex: number): Promise<Item> {
   const itemId = getLogsItemId(year, monthIndex);
-  const items = await OBR.scene.items.getItems([itemId]);
+  const items = await OBR.scene.items.getItems((item) => item.id === itemId);
 
   if (items.length > 0) {
     return items[0];
