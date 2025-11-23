@@ -36,89 +36,119 @@ export const useCalendar = () => {
     let unsubscribeItems: (() => void) | undefined;
 
     const setup = async () => {
-      await new Promise<void>(resolve => OBR.onReady(() => resolve()));
-      if (!active) return;
-
-      const playerRole = await OBR.player.getRole();
-      if (active) setRole(playerRole);
-
-      // 1. Try reading from item metadata
-      let loadedConfig = await readConfig();
-      let allLogs = await readAllLogs();
-
-      // 2. Migration: If no item config found, check room metadata
-      if (!loadedConfig && playerRole === 'GM') {
-        const roomMetadata = await OBR.room.getMetadata();
-        const roomConfig = roomMetadata[METADATA_KEY_CONFIG] as CalendarConfig | undefined;
-
-        if (roomConfig) {
-          // Migrate config from room to item
-          console.log('Migrating config from room metadata to item metadata...');
-          await writeConfig(roomConfig);
-          loadedConfig = roomConfig;
-
-          // Migrate logs from room to items
-          console.log('Migrating logs from room metadata to item metadata...');
-          const roomLogs: CalendarLogs = [];
-          Object.keys(roomMetadata).forEach(key => {
-            if (key.startsWith(METADATA_PREFIX_LOGS)) {
-              const bucketLogs = roomMetadata[key] as CalendarLogs;
-              if (Array.isArray(bucketLogs)) {
-                roomLogs.push(...bucketLogs);
-              }
-            }
-          });
-
-          // Group logs by year/month and write to separate items
-          const buckets = new Map<string, CalendarLogs>();
-          roomLogs.forEach(log => {
-            const key = `${log.date.year}-${log.date.monthIndex}`;
-            if (!buckets.has(key)) {
-              buckets.set(key, []);
-            }
-            buckets.get(key)!.push(log);
-          });
-
-          for (const [key, bucketLogs] of buckets.entries()) {
-            const [yearStr, monthStr] = key.split('-');
-            const year = parseInt(yearStr);
-            const monthIndex = parseInt(monthStr);
-            await writeLogs(year, monthIndex, bucketLogs);
-          }
-
-          allLogs = roomLogs;
-          console.log('Migration complete!');
-        } else {
-          // No existing data, create new
-          loadedConfig = DEFAULT_CONFIG;
-          await writeConfig(DEFAULT_CONFIG);
-        }
-      }
-
-      if (active) {
-        setConfig(loadedConfig || DEFAULT_CONFIG);
-        setLogs(allLogs);
-        setReady(true);
-      }
-
-      // 3. Listen for scene item changes (our calendar items)
-      unsubscribeItems = OBR.scene.items.onChange(async (items) => {
+      try {
+        await new Promise<void>(resolve => OBR.onReady(() => resolve()));
         if (!active) return;
 
-        // Check if any calendar items changed
-        const calendarItems = items.filter(item =>
-          item.id.startsWith('com.username.calendar-')
-        );
+        const playerRole = await OBR.player.getRole();
+        if (active) setRole(playerRole);
 
-        if (calendarItems.length === 0) return;
+        console.log('[Calendar] Starting setup...');
 
-        // Reload config and logs when calendar items change
-        const newConfig = await readConfig();
-        const newLogs = await readAllLogs();
+        // 1. Try reading from item metadata
+        console.log('[Calendar] Reading config from items...');
+        let loadedConfig = await readConfig();
+        console.log('[Calendar] Config loaded:', loadedConfig ? 'Found' : 'Not found');
 
-        if (newConfig) setConfig(newConfig);
-        setLogs(newLogs);
-      });
+        console.log('[Calendar] Reading logs from items...');
+        let allLogs = await readAllLogs();
+        console.log('[Calendar] Logs loaded:', allLogs.length, 'events');
+
+        // 2. Migration: If no item config found, check room metadata
+        if (!loadedConfig && playerRole === 'GM') {
+          console.log('[Calendar] No config found, checking room metadata for migration...');
+          const roomMetadata = await OBR.room.getMetadata();
+          const roomConfig = roomMetadata[METADATA_KEY_CONFIG] as CalendarConfig | undefined;
+
+          if (roomConfig) {
+            // Migrate config from room to item
+            console.log('[Calendar] Migrating config from room metadata to item metadata...');
+            await writeConfig(roomConfig);
+            loadedConfig = roomConfig;
+
+            // Migrate logs from room to items
+            console.log('[Calendar] Migrating logs from room metadata to item metadata...');
+            const roomLogs: CalendarLogs = [];
+            Object.keys(roomMetadata).forEach(key => {
+              if (key.startsWith(METADATA_PREFIX_LOGS)) {
+                const bucketLogs = roomMetadata[key] as CalendarLogs;
+                if (Array.isArray(bucketLogs)) {
+                  roomLogs.push(...bucketLogs);
+                }
+              }
+            });
+
+            // Group logs by year/month and write to separate items
+            const buckets = new Map<string, CalendarLogs>();
+            roomLogs.forEach(log => {
+              const key = `${log.date.year}-${log.date.monthIndex}`;
+              if (!buckets.has(key)) {
+                buckets.set(key, []);
+              }
+              buckets.get(key)!.push(log);
+            });
+
+            for (const [key, bucketLogs] of buckets.entries()) {
+              const [yearStr, monthStr] = key.split('-');
+              const year = parseInt(yearStr);
+              const monthIndex = parseInt(monthStr);
+              await writeLogs(year, monthIndex, bucketLogs);
+            }
+
+            allLogs = roomLogs;
+            console.log('[Calendar] Migration complete!');
+          } else {
+            // No existing data, create new
+            console.log('[Calendar] No existing data, creating default config...');
+            loadedConfig = DEFAULT_CONFIG;
+            await writeConfig(DEFAULT_CONFIG);
+          }
+        }
+
+        // For players, wait for GM to create config
+        if (!loadedConfig && playerRole === 'PLAYER') {
+          console.log('[Calendar] Player mode: using default config until GM creates one');
+          loadedConfig = DEFAULT_CONFIG;
+        }
+
+        if (active) {
+          console.log('[Calendar] Setting state and marking as ready');
+          setConfig(loadedConfig || DEFAULT_CONFIG);
+          setLogs(allLogs);
+          setReady(true);
+        }
+
+        // 3. Listen for scene item changes (our calendar items)
+        unsubscribeItems = OBR.scene.items.onChange(async (items) => {
+          if (!active) return;
+
+          // Check if any calendar items changed
+          const calendarItems = items.filter(item =>
+            item.id.startsWith('com.username.calendar-')
+          );
+
+          if (calendarItems.length === 0) return;
+
+          console.log('[Calendar] Calendar items changed, reloading...');
+          // Reload config and logs when calendar items change
+          const newConfig = await readConfig();
+          const newLogs = await readAllLogs();
+
+          if (newConfig) setConfig(newConfig);
+          setLogs(newLogs);
+        });
+
+        console.log('[Calendar] Setup complete!');
+      } catch (error) {
+        console.error('[Calendar] Error during setup:', error);
+        // Even if there's an error, set ready to true with default config
+        // so the extension doesn't get stuck on loading
+        if (active) {
+          setConfig(DEFAULT_CONFIG);
+          setLogs([]);
+          setReady(true);
+        }
+      }
     };
 
     if (OBR.isAvailable) setup();
