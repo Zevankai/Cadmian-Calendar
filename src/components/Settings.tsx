@@ -1,0 +1,291 @@
+import React, { useState, useRef } from 'react';
+import OBR from '@owlbear-rodeo/sdk';
+import type { CalendarConfig, MonthConfig, SeasonName, BiomeType, DateTimeState, CalendarLogs } from '../types';
+import { METADATA_KEY_CONFIG, METADATA_PREFIX_LOGS } from '../types';
+
+interface SettingsProps {
+  config: CalendarConfig;
+  onSave: (newConfig: CalendarConfig) => void;
+  onCancel: () => void;
+}
+
+export const Settings: React.FC<SettingsProps> = ({ config, onSave, onCancel }) => {
+  const [localConfig, setLocalConfig] = useState<CalendarConfig>(JSON.parse(JSON.stringify(config)));
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- ARCHIVING HELPERS ---
+
+  const handleExport = async () => {
+    // 1. Get ALL current logs from OBR directly
+    const metadata = await OBR.room.getMetadata();
+    const allLogs: CalendarLogs = [];
+    
+    // 2. Find all bucket keys (e.g. logs.1492-0, logs.1492-1)
+    Object.keys(metadata).forEach(key => {
+      if (key.startsWith(METADATA_PREFIX_LOGS)) {
+        const bucketLogs = metadata[key] as CalendarLogs;
+        if (Array.isArray(bucketLogs)) allLogs.push(...bucketLogs);
+      }
+    });
+
+    // 3. Create the backup object
+    const backupData = {
+      version: "1.0.0",
+      timestamp: Date.now(),
+      config: localConfig,
+      logs: allLogs
+    };
+
+    // 4. Download file
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", `calendar_backup_${localConfig.currentDate.year}_${localConfig.currentDate.monthIndex}.json`);
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const json = JSON.parse(e.target?.result as string);
+        if (!json.config || !json.logs) {
+            alert("Invalid Calendar Backup File");
+            return;
+        }
+
+        if (confirm("Importing will OVERWRITE your current settings. Are you sure?")) {
+            // 1. Restore Config
+            setLocalConfig(json.config); // Update UI
+            await OBR.room.setMetadata({ [METADATA_KEY_CONFIG]: json.config });
+
+            // 2. Restore Logs - First NUKE existing logs to prevent duplicates
+            const currentMeta = await OBR.room.getMetadata();
+            const keysToDelete: Record<string, undefined> = {};
+            Object.keys(currentMeta).forEach(k => {
+                if (k.startsWith(METADATA_PREFIX_LOGS)) keysToDelete[k] = undefined;
+            });
+            await OBR.room.setMetadata(keysToDelete);
+
+            // 3. Bucket the new logs
+            const newLogs = json.logs as CalendarLogs;
+            const buckets: Record<string, CalendarLogs> = {};
+
+            newLogs.forEach(log => {
+                // Re-calculate the bucket key for each log
+                const key = `${METADATA_PREFIX_LOGS}.${log.date.year}-${log.date.monthIndex}`;
+                if (!buckets[key]) buckets[key] = [];
+                buckets[key].push(log);
+            });
+
+            // 4. Batch update OBR
+            await OBR.room.setMetadata(buckets);
+
+            alert("Import Successful! Reloading...");
+            window.location.reload();
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Error parsing JSON file");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handlePurgeLogs = async () => {
+      if (confirm("This will DELETE ALL EVENTS from the room to free up space. Ensure you have exported a backup first! Continue?")) {
+        const currentMeta = await OBR.room.getMetadata();
+        const keysToDelete: Record<string, undefined> = {};
+        Object.keys(currentMeta).forEach(k => {
+            if (k.startsWith(METADATA_PREFIX_LOGS)) keysToDelete[k] = undefined;
+        });
+        await OBR.room.setMetadata(keysToDelete);
+        window.location.reload();
+      }
+  };
+
+  const handleDebugKeys = async () => {
+    const meta = await OBR.room.getMetadata();
+    const keys = Object.keys(meta).filter(k => k.startsWith('com.username.calendar'));
+    alert("Current Metadata Keys in Room:\n\n" + keys.join('\n'));
+  };
+
+  // --- CONFIG HELPERS ---
+  const handleDateChange = (field: keyof DateTimeState, value: number) => {
+    setLocalConfig({ ...localConfig, currentDate: { ...localConfig.currentDate, [field]: value } });
+  };
+  const removeMonth = (index: number) => {
+    const newMonths = localConfig.months.filter((_, i) => i !== index);
+    setLocalConfig({ ...localConfig, months: newMonths });
+  };
+  const addMonth = () => {
+    setLocalConfig({ ...localConfig, months: [...localConfig.months, { name: 'New Month', days: 30, season: 'Spring' }] });
+  };
+  const handleMonthChange = (index: number, field: keyof MonthConfig, value: any) => {
+    const newMonths = [...localConfig.months];
+    newMonths[index] = { ...newMonths[index], [field]: value };
+    setLocalConfig({ ...localConfig, months: newMonths });
+  };
+  const removeWeekDay = (index: number) => {
+    const newDays = localConfig.weekDays.filter((_, i) => i !== index);
+    setLocalConfig({ ...localConfig, weekDays: newDays });
+  }
+  const addWeekDay = () => {
+    setLocalConfig({ ...localConfig, weekDays: [...localConfig.weekDays, { name: 'NewDay' }] });
+  }
+  const handleWeekDayChange = (index: number, value: string) => {
+    const newWeek = [...localConfig.weekDays];
+    newWeek[index] = { name: value };
+    setLocalConfig({ ...localConfig, weekDays: newWeek });
+  };
+
+  return (
+    <div style={{ padding: '1rem', background: '#1a1a1a', height: '100%', overflowY: 'auto', color: '#eee', fontSize: '0.9rem' }}>
+      <h2 style={{ borderBottom: '1px solid #444', paddingBottom: '0.5rem', marginTop: 0 }}>Settings</h2>
+
+      {/* --- ARCHIVING --- */}
+      <div style={{ background: '#222', padding: '10px', borderRadius: '4px', marginBottom: '1.5rem', border: '1px solid #444' }}>
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#55aaff' }}>Data Management</h3>
+        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+            <button onClick={handleExport} className="btn-secondary" style={{ flex: 1 }}>↓ Export Backup</button>
+            <button onClick={() => fileInputRef.current?.click()} className="btn-secondary" style={{ flex: 1 }}>↑ Import Backup</button>
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                style={{ display: 'none' }} 
+                accept=".json"
+                onChange={handleImport}
+            />
+        </div>
+        <button onClick={handlePurgeLogs} style={{ marginTop: '5px', width: '100%', background: 'transparent', border: '1px solid #774444', color: '#dd8888', cursor: 'pointer', padding: '4px', borderRadius: '3px' }}>
+            Purge All Events (Free Space)
+        </button>
+      </div>
+      
+      {/* --- CURRENT DATE OVERRIDE --- */}
+      <div style={{ background: '#2a2a2a', padding: '10px', borderRadius: '4px', marginBottom: '1.5rem', border: '1px solid #444' }}>
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#4CAF50' }}>Current Date Override</h3>
+        <div style={{ display: 'flex', gap: '5px' }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '0.75rem', color: '#aaa' }}>Year</label>
+            <input type="number" className="settings-input" value={localConfig.currentDate.year} onChange={(e) => handleDateChange('year', parseInt(e.target.value))} />
+          </div>
+          <div style={{ flex: 2 }}>
+            <label style={{ fontSize: '0.75rem', color: '#aaa' }}>Month</label>
+            <select className="settings-input" value={localConfig.currentDate.monthIndex} onChange={(e) => handleDateChange('monthIndex', parseInt(e.target.value))}>
+              {localConfig.months.map((m, i) => <option key={i} value={i}>{m.name}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '0.75rem', color: '#aaa' }}>Day</label>
+            <input type="number" className="settings-input" value={localConfig.currentDate.day} onChange={(e) => handleDateChange('day', parseInt(e.target.value))} />
+          </div>
+        </div>
+      </div>
+
+      {/* --- GLOBAL CONFIG --- */}
+      <h3 style={{ fontSize: '0.9rem', marginTop: '10px', marginBottom: '5px' }}>World Config</h3>
+      <div style={{ marginBottom: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        <label>
+          <div style={{fontSize: '0.8rem', color: '#aaa'}}>Year Suffix</div>
+          <input className="settings-input" value={localConfig.yearName} onChange={e => setLocalConfig({...localConfig, yearName: e.target.value})} />
+        </label>
+        <label>
+          <div style={{fontSize: '0.8rem', color: '#aaa'}}>Moon Cycle</div>
+          <input type="number" className="settings-input" value={localConfig.moonCycle} onChange={e => setLocalConfig({...localConfig, moonCycle: parseFloat(e.target.value)})} />
+        </label>
+      </div>
+
+      <div style={{ marginBottom: '1rem' }}>
+         <label style={{fontSize: '0.8rem', color: '#aaa'}}>Active Region Biome</label>
+         <select className="settings-input" value={localConfig.activeBiome || 'Temperate'} onChange={(e) => setLocalConfig({...localConfig, activeBiome: e.target.value as BiomeType})} style={{ border: '1px solid #4CAF50', color: '#81c784' }}>
+            <option value="Temperate">Temperate</option>
+            <option value="Mediterranean">Mediterranean</option>
+            <option value="Desert">Desert</option>
+            <option value="Polar">Polar</option>
+            <option value="Rainforest">Rainforest</option>
+            <option value="Underdark">Underdark</option>
+         </select>
+      </div>
+
+      <div style={{ marginBottom: '1rem' }}>
+         <label style={{fontSize: '0.8rem', color: '#aaa'}}>Year 0 Start Day</label>
+         <select className="settings-input" value={localConfig.yearStartDayOffset || 0} onChange={(e) => setLocalConfig({...localConfig, yearStartDayOffset: parseInt(e.target.value)})}>
+            {localConfig.weekDays.map((day, idx) => <option key={idx} value={idx}>{day.name}</option>)}
+         </select>
+      </div>
+
+      <hr style={{borderColor: '#333'}} />
+
+      <h3 style={{fontSize: '0.9rem', marginTop: '10px'}}>Days of Week</h3>
+      <div style={{display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '10px'}}>
+        {localConfig.weekDays.map((day, idx) => (
+          <div key={idx} style={{display: 'flex', gap: '5px'}}>
+             <input className="settings-input" value={day.name} onChange={(e) => handleWeekDayChange(idx, e.target.value)} />
+             <button onClick={() => removeWeekDay(idx)} className="btn-danger">x</button>
+          </div>
+        ))}
+        <button onClick={addWeekDay} className="btn-secondary" style={{ width: '100%' }}>+ Add Day</button>
+      </div>
+
+      <h3 style={{fontSize: '0.9rem', marginTop: '20px'}}>Months</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+        {localConfig.months.map((month, idx) => (
+          <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 0.4fr 0.8fr auto', gap: '5px', alignItems: 'center' }}>
+            <input className="settings-input" value={month.name} onChange={(e) => handleMonthChange(idx, 'name', e.target.value)} />
+            <input className="settings-input" type="number" value={month.days} onChange={(e) => handleMonthChange(idx, 'days', parseInt(e.target.value))} />
+            <select className="settings-input" value={month.season} onChange={(e) => handleMonthChange(idx, 'season', e.target.value as SeasonName)}>
+              <option value="Winter">Winter</option>
+              <option value="Spring">Spring</option>
+              <option value="Summer">Summer</option>
+              <option value="Fall">Fall</option>
+            </select>
+            <button onClick={() => removeMonth(idx)} className="btn-danger">X</button>
+          </div>
+        ))}
+        <button onClick={addMonth} className="btn-secondary">+ Add Month</button>
+      </div>
+
+      <div style={{ marginTop: '20px', display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <button onClick={() => onSave(localConfig)} className="btn-primary" style={{ flex: 1 }}>Save Changes</button>
+        <button onClick={onCancel} className="btn-secondary">Cancel</button>
+      </div>
+
+      {/* DANGER ZONE */}
+      <div style={{ marginTop: '30px', borderTop: '1px solid #522', paddingTop: '20px' }}>
+        <h3 style={{ color: '#f55', fontSize: '0.8rem', marginTop: 0 }}>Danger Zone</h3>
+        <button 
+          className="btn-secondary" 
+          style={{ width: '100%', marginBottom: '10px' }} 
+          onClick={handleDebugKeys}
+        >
+          🔍 Debug: Show Storage Keys
+        </button>
+
+        <button className="btn-danger" style={{ width: '100%', padding: '10px', border: '1px solid #f55', color: '#f55' }} onClick={async () => {
+            if (confirm("ARE YOU SURE? This will wipe ALL calendar data, logs, and settings permanently.")) {
+                const metadata = await OBR.room.getMetadata();
+                const keysToDelete: Record<string, undefined> = {};
+                Object.keys(metadata).forEach(key => {
+                    if (key.startsWith('com.username.calendar')) keysToDelete[key] = undefined;
+                });
+                await OBR.room.setMetadata(keysToDelete);
+                window.location.reload();
+            }
+        }}>☢ NUKE ALL CALENDAR DATA</button>
+      </div>
+      
+      <style>{`
+        .settings-input { background: #333; border: 1px solid #444; color: white; padding: 4px; border-radius: 3px; width: 100%; }
+        .btn-danger { background: transparent; border: 1px solid #522; color: #f55; cursor: pointer; border-radius: 3px; }
+        .btn-primary { background: #4CAF50; color: white; border: none; padding: 10px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .btn-secondary { background: #444; color: white; border: 1px solid #555; padding: 10px; border-radius: 4px; cursor: pointer; }
+      `}</style>
+    </div>
+  );
+};

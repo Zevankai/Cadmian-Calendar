@@ -1,0 +1,91 @@
+.container {
+  background: #2a2a2a;
+  border-top: 1px solid #444;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.noteItem {
+  background: #333;
+  border-radius: 4px;
+  padding: 0.5rem;
+  border-left: 4px solid #646cff;
+}
+
+.noteItem.gmOnly {
+  border-left-color: #ff4444;
+  background: #3a2a2a;
+}
+
+.noteHeader {
+  display: flex;
+  justify-content: space-between;
+  font-weight: bold;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.noteContent {
+  font-size: 0.85rem;
+  color: #ccc;
+  white-space: pre-wrap;
+}
+
+.emptyState {
+  color: #777;
+  text-align: center;
+  font-style: italic;
+  padding: 1rem;
+}
+
+/* Form Styles */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: #222;
+  padding: 0.5rem;
+  border-radius: 4px;
+}
+
+.input, .textarea {
+  background: #111;
+  border: 1px solid #444;
+  color: white;
+  padding: 0.5rem;
+  border-radius: 2px;
+  font-family: inherit;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #aaa;
+}
+
+.saveButton {
+  background: #646cff;
+  color: white;
+  border: none;
+  padding: 0.5rem;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.saveButton:hover {
+  background: #535bf2;
+}
+
+.deleteBtn {
+  background: transparent;
+  border: none;
+  color: #ff4444;
+  cursor: pointer;
+  font-size: 0.8rem;
+}

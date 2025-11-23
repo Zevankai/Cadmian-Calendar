@@ -1,0 +1,13 @@
+{
+  "name": "Custom Calendars",
+  "version": "1.0.0",
+  "manifest_version": 1,
+  "icon": "/icon.svg",
+  "action": {
+    "title": "Calendar",
+    "icon": "/icon.svg",
+    "popover": "/",
+    "width": 400,
+    "height": 600
+  }
+}

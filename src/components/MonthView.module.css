@@ -1,0 +1,109 @@
+.container {
+  padding: 10px;
+  background: #1a1a1a;
+  user-select: none;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #eee;
+}
+
+.grid {
+  display: grid;
+  gap: 4px;
+}
+
+.dayName {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: uppercase;
+  padding-bottom: 4px;
+}
+
+.cell {
+  aspect-ratio: 1;
+  background: #2a2a2a;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+  padding-top: 4px;
+  font-size: 0.9rem;
+  color: #ccc;
+  border: 1px solid transparent; /* Reserve space for border to prevent jumping */
+}
+
+.cell:hover {
+  background: #3a3a3a;
+  color: white;
+}
+
+.cell.empty {
+  background: transparent;
+  pointer-events: none;
+  border: none;
+}
+
+/* --- THE "CURRENT GAME DATE" HIGHLIGHT --- */
+.cell.today {
+  border: 2px solid #ff9800; /* Bright Gold/Orange Border */
+  background: #332a00; /* Very subtle gold tint background */
+  color: white;
+  font-weight: bold;
+  box-shadow: 0 0 10px rgba(255, 152, 0, 0.3); /* Glowing effect */
+  z-index: 2; /* Ensure glow sits on top of neighbors */
+}
+
+/* --- THE "USER CLICKED" HIGHLIGHT --- */
+.cell.selected {
+  background: #444;
+  border-color: #888; /* Grey border for selection */
+}
+
+/* COMBINED: If today is ALSO selected */
+.cell.today.selected {
+  border-color: #ff9800; /* Keep the gold border */
+  background: #443a10; /* Mix the backgrounds */
+}
+
+.navButton {
+  background: transparent;
+  border: 1px solid #444;
+  color: #aaa;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.navButton:hover {
+  background: #333;
+  color: white;
+}
+
+/* DOTS CONTAINER */
+.dotContainer {
+  display: flex;
+  gap: 2px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 80%;
+}
+
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  display: block;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.5); /* Tiny shadow for pop */
+}
