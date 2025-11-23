@@ -45,6 +45,11 @@ export const useCalendar = () => {
 
         console.log('[Calendar] Starting setup...');
 
+        // Wait for scene to be ready
+        console.log('[Calendar] Waiting for scene to be ready...');
+        await OBR.scene.isReady();
+        console.log('[Calendar] Scene is ready!');
+
         // 1. Try reading from item metadata
         console.log('[Calendar] Reading config from items...');
         let loadedConfig = await readConfig();
