@@ -8,11 +8,12 @@ import { Settings } from './components/Settings';
 import { CompactHeader } from './components/CompactHeader';
 import type { DateTimeState } from './types';
 import { getMoonPhase } from './utils/calendarMath';
+import { getThemeColors, applyTheme } from './utils/theme';
 
 function App() {
   // FIXED: Removed 'role' from this line
   const { ready, config, logs, isGM, actions } = useCalendar();
-  
+
   const [viewDate, setViewDate] = useState<DateTimeState | null>(null);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
   const [activeTab, setActiveTab] = useState<'calendar' | 'settings'>('calendar');
@@ -22,6 +23,18 @@ function App() {
       setViewDate(config.currentDate);
     }
   }, [config, viewDate]);
+
+  // Apply dynamic theme based on biome and season
+  useEffect(() => {
+    if (config) {
+      const currentMonth = config.months[config.currentDate.monthIndex];
+      const season = currentMonth.season;
+      const biome = config.activeBiome;
+
+      const themeColors = getThemeColors(biome, season);
+      applyTheme(themeColors);
+    }
+  }, [config]);
 
   if (!ready || !config || !viewDate) return <div className="loading">Loading...</div>;
 
