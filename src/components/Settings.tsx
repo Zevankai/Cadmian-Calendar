@@ -157,6 +157,65 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
     alert(report);
   };
 
+  const handleCleanOtherExtensions = async () => {
+    const meta = await OBR.room.getMetadata();
+
+    // Find all non-calendar metadata keys
+    const otherKeys: Array<{ key: string; size: number; sizeStr: string }> = [];
+
+    Object.keys(meta).forEach(key => {
+      // Skip calendar-related keys
+      if (key.startsWith('com.username.calendar')) return;
+
+      const value = meta[key];
+      const jsonStr = JSON.stringify(value);
+      const sizeBytes = new Blob([jsonStr]).size;
+
+      otherKeys.push({
+        key,
+        size: sizeBytes,
+        sizeStr: formatBytes(sizeBytes)
+      });
+    });
+
+    if (otherKeys.length === 0) {
+      alert('No metadata from other extensions found!');
+      return;
+    }
+
+    // Sort by size (largest first)
+    otherKeys.sort((a, b) => b.size - a.size);
+
+    // Build list
+    let list = `Found ${otherKeys.length} metadata key(s) from other extensions:\n\n`;
+    otherKeys.forEach(({ key, sizeStr }, idx) => {
+      list += `${idx + 1}. ${sizeStr.padEnd(10)} ${key}\n`;
+    });
+    list += `\nWould you like to delete these?`;
+
+    if (!confirm(list)) return;
+
+    // Ask for confirmation for each key
+    const keysToDelete: Record<string, undefined> = {};
+    let deletedCount = 0;
+
+    for (const { key, sizeStr } of otherKeys) {
+      if (confirm(`Delete "${key}" (${sizeStr})?`)) {
+        keysToDelete[key] = undefined;
+        deletedCount++;
+      }
+    }
+
+    if (deletedCount === 0) {
+      alert('No metadata deleted.');
+      return;
+    }
+
+    // Delete the selected keys
+    await OBR.room.setMetadata(keysToDelete);
+    alert(`Deleted ${deletedCount} metadata key(s) from other extensions.`);
+  };
+
   // --- CONFIG HELPERS ---
   const handleDateChange = (field: keyof DateTimeState, value: number) => {
     setLocalConfig({ ...localConfig, currentDate: { ...localConfig.currentDate, [field]: value } });
@@ -448,6 +507,14 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
           onClick={handleViewAllMetadata}
         >
           📊 View All Room Metadata
+        </button>
+
+        <button
+          className="btn-secondary"
+          style={{ width: '100%', marginBottom: '10px' }}
+          onClick={handleCleanOtherExtensions}
+        >
+          🧹 Clean Other Extension Data
         </button>
 
         <button
