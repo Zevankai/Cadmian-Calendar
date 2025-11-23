@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import OBR from '@owlbear-rodeo/sdk';
 import type { CalendarConfig, MonthConfig, SeasonName, BiomeType, DateTimeState, CalendarLogs } from '../types';
 import { METADATA_KEY_CONFIG, METADATA_PREFIX_LOGS } from '../types';
-import { getMonthMetadataStats, formatBytes, getUsageColor } from '../utils/metadataStats';
+import { getMonthMetadataStats, formatBytes, getUsageColor, calculateDataSize, calculateUsagePercentage } from '../utils/metadataStats';
 
 interface SettingsProps {
   config: CalendarConfig;
@@ -200,23 +200,53 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
         border: '1px solid rgba(255, 255, 255, 0.15)',
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
       }}>
-        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#a78bfa' }}>Metadata Usage by Month</h3>
-        <div style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: '10px' }}>
-          Each month/year stores events in a separate metadata key (16KB limit per key)
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#a78bfa' }}>Storage Usage (Item-Based)</h3>
+        <div style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: '12px' }}>
+          <strong>New:</strong> Using item metadata storage where each month gets its own 16KB storage.
+          Events are split by month, allowing virtually unlimited total storage.
         </div>
 
         {(() => {
+          // Calculate month metadata stats
           const monthStats = getMonthMetadataStats(logs, localConfig.months.map(m => m.name));
 
-          if (monthStats.length === 0) {
-            return <div style={{ color: '#888', fontStyle: 'italic', padding: '10px', textAlign: 'center' }}>
-              No events created yet
-            </div>;
-          }
-
           return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
-              {monthStats.map((stat, idx) => {
+            <>
+              {/* Config Item Display */}
+              <div style={{
+                background: 'rgba(100, 108, 255, 0.1)',
+                padding: '14px',
+                borderRadius: '10px',
+                border: '2px solid rgba(100, 108, 255, 0.3)',
+                marginBottom: '16px',
+                boxShadow: '0 0 20px rgba(100, 108, 255, 0.2)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#fff' }}>
+                    Config Item
+                  </div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#a5b4fc' }}>
+                    {(() => {
+                      const configSize = calculateDataSize(localConfig);
+                      const configPercentage = calculateUsagePercentage(configSize);
+                      return `${configPercentage.toFixed(1)}% of 16 KB`;
+                    })()}
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.75rem', color: '#ddd' }}>
+                  Calendar configuration stored in dedicated item
+                </div>
+              </div>
+
+              {/* Per-Month Breakdown */}
+              {monthStats.length > 0 && (
+                <>
+                  <div style={{ fontSize: '0.8rem', color: '#bbb', marginBottom: '8px', fontWeight: '600' }}>
+                    Event Items (Each month has 16KB storage)
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                    {monthStats.map((stat, idx) => {
                 const usageColor = getUsageColor(stat.usagePercentage);
                 return (
                   <div key={idx} style={{
@@ -264,6 +294,9 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
                 );
               })}
             </div>
+                </>
+              )}
+            </>
           );
         })()}
       </div>
