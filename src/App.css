@@ -5,7 +5,7 @@ html, body, #root {
   margin: 0;
   padding: 0;
   overflow: hidden; /* Prevent body scroll, let app-container handle it */
-  background-color: #1a1a1a;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
   font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
   color: #e0e0e0;
 }
@@ -22,18 +22,23 @@ html, body, #root {
   flex: 1;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #444 #1a1a1a;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  margin: 8px;
+  border-radius: 12px;
 }
 
 .scroll-area::-webkit-scrollbar {
   width: 8px;
 }
 .scroll-area::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: transparent;
 }
 .scroll-area::-webkit-scrollbar-thumb {
-  background-color: #444;
+  background-color: rgba(255, 255, 255, 0.2);
   border-radius: 4px;
+}
+.scroll-area::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.3);
 }
 
 /* LOADING SCREEN */

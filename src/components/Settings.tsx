@@ -145,12 +145,33 @@ export const Settings: React.FC<SettingsProps> = ({ config, onSave, onCancel }) 
   };
 
   return (
-    <div style={{ padding: '1rem', background: '#1a1a1a', height: '100%', overflowY: 'auto', color: '#eee', fontSize: '0.9rem' }}>
-      <h2 style={{ borderBottom: '1px solid #444', paddingBottom: '0.5rem', marginTop: 0 }}>Settings</h2>
+    <div style={{
+      padding: '1.5rem',
+      background: 'transparent',
+      height: '100%',
+      overflowY: 'auto',
+      color: '#eee',
+      fontSize: '0.9rem'
+    }}>
+      <h2 style={{
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+        paddingBottom: '0.75rem',
+        marginTop: 0,
+        color: '#fff',
+        textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
+      }}>Settings</h2>
 
       {/* --- ARCHIVING --- */}
-      <div style={{ background: '#222', padding: '10px', borderRadius: '4px', marginBottom: '1.5rem', border: '1px solid #444' }}>
-        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#55aaff' }}>Data Management</h3>
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.08)',
+        backdropFilter: 'blur(8px)',
+        padding: '12px',
+        borderRadius: '12px',
+        marginBottom: '1.5rem',
+        border: '1px solid rgba(255, 255, 255, 0.15)',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
+      }}>
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#7dd3fc' }}>Data Management</h3>
         <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
             <button onClick={handleExport} className="btn-secondary" style={{ flex: 1 }}>↓ Export Backup</button>
             <button onClick={() => fileInputRef.current?.click()} className="btn-secondary" style={{ flex: 1 }}>↑ Import Backup</button>
@@ -168,8 +189,16 @@ export const Settings: React.FC<SettingsProps> = ({ config, onSave, onCancel }) 
       </div>
       
       {/* --- CURRENT DATE OVERRIDE --- */}
-      <div style={{ background: '#2a2a2a', padding: '10px', borderRadius: '4px', marginBottom: '1.5rem', border: '1px solid #444' }}>
-        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#4CAF50' }}>Current Date Override</h3>
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.08)',
+        backdropFilter: 'blur(8px)',
+        padding: '12px',
+        borderRadius: '12px',
+        marginBottom: '1.5rem',
+        border: '1px solid rgba(255, 255, 255, 0.15)',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
+      }}>
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#86efac' }}>Current Date Override</h3>
         <div style={{ display: 'flex', gap: '5px' }}>
           <div style={{ flex: 1 }}>
             <label style={{ fontSize: '0.75rem', color: '#aaa' }}>Year</label>
@@ -281,10 +310,67 @@ export const Settings: React.FC<SettingsProps> = ({ config, onSave, onCancel }) 
       </div>
       
       <style>{`
-        .settings-input { background: #333; border: 1px solid #444; color: white; padding: 4px; border-radius: 3px; width: 100%; }
-        .btn-danger { background: transparent; border: 1px solid #522; color: #f55; cursor: pointer; border-radius: 3px; }
-        .btn-primary { background: #4CAF50; color: white; border: none; padding: 10px; border-radius: 4px; font-weight: bold; cursor: pointer; }
-        .btn-secondary { background: #444; color: white; border: 1px solid #555; padding: 10px; border-radius: 4px; cursor: pointer; }
+        .settings-input {
+          background: rgba(0, 0, 0, 0.3);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          color: white;
+          padding: 8px;
+          border-radius: 8px;
+          width: 100%;
+          transition: all 0.2s ease;
+        }
+        .settings-input:focus {
+          outline: none;
+          border-color: rgba(255, 255, 255, 0.4);
+          background: rgba(0, 0, 0, 0.4);
+          box-shadow: 0 0 0 3px rgba(100, 108, 255, 0.2);
+        }
+        .btn-danger {
+          background: rgba(255, 85, 85, 0.1);
+          border: 1px solid rgba(255, 85, 85, 0.3);
+          color: #ff8888;
+          cursor: pointer;
+          border-radius: 8px;
+          padding: 6px 12px;
+          transition: all 0.2s ease;
+          backdrop-filter: blur(5px);
+        }
+        .btn-danger:hover {
+          background: rgba(255, 85, 85, 0.2);
+          border-color: rgba(255, 85, 85, 0.5);
+          color: #ffaaaa;
+        }
+        .btn-primary {
+          background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+          color: white;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          padding: 12px;
+          border-radius: 8px;
+          font-weight: bold;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+        }
+        .btn-primary:hover {
+          background: linear-gradient(135deg, #45a049 0%, #4CAF50 100%);
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(76, 175, 80, 0.5);
+        }
+        .btn-secondary {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(5px);
+          color: white;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          padding: 10px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .btn-secondary:hover {
+          background: rgba(255, 255, 255, 0.2);
+          border-color: rgba(255, 255, 255, 0.3);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
       `}</style>
     </div>
   );
