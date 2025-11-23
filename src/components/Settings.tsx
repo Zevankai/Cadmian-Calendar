@@ -117,6 +117,46 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
     alert("Current Metadata Keys in Room:\n\n" + keys.join('\n'));
   };
 
+  const handleViewAllMetadata = async () => {
+    const meta = await OBR.room.getMetadata();
+
+    // Calculate size for each key
+    const keyData: Array<{ key: string; size: number; sizeStr: string }> = [];
+    let totalSize = 0;
+
+    Object.keys(meta).forEach(key => {
+      const value = meta[key];
+      const jsonStr = JSON.stringify(value);
+      const sizeBytes = new Blob([jsonStr]).size;
+      totalSize += sizeBytes;
+
+      keyData.push({
+        key,
+        size: sizeBytes,
+        sizeStr: formatBytes(sizeBytes)
+      });
+    });
+
+    // Sort by size (largest first)
+    keyData.sort((a, b) => b.size - a.size);
+
+    // Build report
+    const totalSizeStr = formatBytes(totalSize);
+    const percentUsed = ((totalSize / (16 * 1024)) * 100).toFixed(1);
+
+    let report = `=== ROOM METADATA REPORT ===\n\n`;
+    report += `Total: ${totalSizeStr} / 16 KB (${percentUsed}%)\n`;
+    report += `Keys: ${keyData.length}\n\n`;
+    report += `--- BY SIZE (Largest First) ---\n\n`;
+
+    keyData.forEach(({ key, sizeStr }) => {
+      report += `${sizeStr.padEnd(10)} ${key}\n`;
+    });
+
+    // Show in a modal-like alert
+    alert(report);
+  };
+
   // --- CONFIG HELPERS ---
   const handleDateChange = (field: keyof DateTimeState, value: number) => {
     setLocalConfig({ ...localConfig, currentDate: { ...localConfig.currentDate, [field]: value } });
@@ -402,9 +442,17 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
       {/* DANGER ZONE */}
       <div style={{ marginTop: '30px', borderTop: '1px solid #522', paddingTop: '20px' }}>
         <h3 style={{ color: '#f55', fontSize: '0.8rem', marginTop: 0 }}>Danger Zone</h3>
-        <button 
-          className="btn-secondary" 
-          style={{ width: '100%', marginBottom: '10px' }} 
+        <button
+          className="btn-secondary"
+          style={{ width: '100%', marginBottom: '10px' }}
+          onClick={handleViewAllMetadata}
+        >
+          📊 View All Room Metadata
+        </button>
+
+        <button
+          className="btn-secondary"
+          style={{ width: '100%', marginBottom: '10px' }}
           onClick={handleDebugKeys}
         >
           🔍 Debug: Show Storage Keys
