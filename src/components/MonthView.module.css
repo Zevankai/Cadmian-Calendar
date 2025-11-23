@@ -68,12 +68,12 @@
 
 /* --- THE "CURRENT GAME DATE" HIGHLIGHT --- */
 .cell.today {
-  border: 2px solid #ff9800;
-  background: rgba(255, 152, 0, 0.2);
+  border: 2px solid var(--theme-accent-primary, #ff9800);
+  background: var(--theme-glass-base, rgba(255, 152, 0, 0.2));
   backdrop-filter: blur(8px);
   color: white;
   font-weight: bold;
-  box-shadow: 0 0 20px rgba(255, 152, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 20px var(--theme-glass-base, rgba(255, 152, 0, 0.5)), 0 4px 12px rgba(0, 0, 0, 0.3);
   z-index: 2;
 }
 
@@ -86,8 +86,8 @@
 
 /* COMBINED: If today is ALSO selected */
 .cell.today.selected {
-  border-color: #ff9800;
-  background: rgba(255, 152, 0, 0.25);
+  border-color: var(--theme-accent-primary, #ff9800);
+  background: var(--theme-glass-base, rgba(255, 152, 0, 0.25));
   backdrop-filter: blur(8px);
 }
 
