@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import OBR from '@owlbear-rodeo/sdk';
 import type { CalendarConfig, MonthConfig, SeasonName, BiomeType, DateTimeState, CalendarLogs } from '../types';
 import { METADATA_KEY_CONFIG, METADATA_PREFIX_LOGS } from '../types';
-import { getMonthMetadataStats, formatBytes, getUsageColor } from '../utils/metadataStats';
+import { getMonthMetadataStats, getTotalMetadataUsage, formatBytes, getUsageColor } from '../utils/metadataStats';
 
 interface SettingsProps {
   config: CalendarConfig;
@@ -200,23 +200,88 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
         border: '1px solid rgba(255, 255, 255, 0.15)',
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
       }}>
-        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#a78bfa' }}>Metadata Usage by Month</h3>
-        <div style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: '10px' }}>
-          Each month/year stores events in a separate metadata key (16KB limit per key)
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#a78bfa' }}>Room Metadata Usage</h3>
+        <div style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: '12px' }}>
+          <strong>Important:</strong> All metadata keys share a single 16KB total room limit.
+          Splitting events into separate month keys helps organize data, but all keys count toward the same 16KB total.
         </div>
 
         {(() => {
+          // Calculate total metadata usage
+          const totalUsage = getTotalMetadataUsage(localConfig, logs);
+          const totalColor = getUsageColor(totalUsage.usagePercentage);
           const monthStats = getMonthMetadataStats(logs, localConfig.months.map(m => m.name));
 
-          if (monthStats.length === 0) {
-            return <div style={{ color: '#888', fontStyle: 'italic', padding: '10px', textAlign: 'center' }}>
-              No events created yet
-            </div>;
-          }
-
           return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
-              {monthStats.map((stat, idx) => {
+            <>
+              {/* Total Usage Display */}
+              <div style={{
+                background: `linear-gradient(135deg, ${totalColor}15 0%, ${totalColor}05 100%)`,
+                padding: '14px',
+                borderRadius: '10px',
+                border: `2px solid ${totalColor}`,
+                marginBottom: '16px',
+                boxShadow: `0 0 20px ${totalColor}40`
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#fff' }}>
+                    Total Room Usage
+                  </div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: totalColor }}>
+                    {totalUsage.usagePercentage.toFixed(1)}%
+                  </div>
+                </div>
+
+                {/* Total progress bar */}
+                <div style={{
+                  width: '100%',
+                  height: '12px',
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  borderRadius: '6px',
+                  overflow: 'hidden',
+                  marginBottom: '8px'
+                }}>
+                  <div style={{
+                    width: `${Math.min(totalUsage.usagePercentage, 100)}%`,
+                    height: '100%',
+                    background: `linear-gradient(90deg, ${totalColor} 0%, ${totalColor}CC 100%)`,
+                    transition: 'width 0.5s ease',
+                    boxShadow: `0 0 10px ${totalColor}80`
+                  }} />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                  <span style={{ color: '#ddd' }}>
+                    Config + All Events
+                  </span>
+                  <span style={{ color: '#fff', fontWeight: '600' }}>
+                    {formatBytes(totalUsage.sizeBytes)} / 16 KB
+                  </span>
+                </div>
+
+                {totalUsage.usagePercentage > 80 && (
+                  <div style={{
+                    marginTop: '10px',
+                    padding: '8px',
+                    background: 'rgba(239, 68, 68, 0.2)',
+                    border: '1px solid #ef4444',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    color: '#fca5a5'
+                  }}>
+                    ⚠️ Warning: Approaching room metadata limit. Consider exporting and purging old events.
+                  </div>
+                )}
+              </div>
+
+              {/* Per-Month Breakdown */}
+              {monthStats.length > 0 && (
+                <>
+                  <div style={{ fontSize: '0.8rem', color: '#bbb', marginBottom: '8px', fontWeight: '600' }}>
+                    Breakdown by Month
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                    {monthStats.map((stat, idx) => {
                 const usageColor = getUsageColor(stat.usagePercentage);
                 return (
                   <div key={idx} style={{
@@ -264,6 +329,9 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
                 );
               })}
             </div>
+                </>
+              )}
+            </>
           );
         })()}
       </div>

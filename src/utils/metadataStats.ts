@@ -1,8 +1,8 @@
-import type { CalendarLogs } from '../types';
+import type { CalendarLogs, CalendarConfig } from '../types';
 
 /**
- * Owlbear Rodeo metadata size limit per key (in bytes)
- * According to OBR documentation, the limit is 16KB per key
+ * Owlbear Rodeo metadata size limit (in bytes)
+ * This is a TOTAL ROOM LIMIT - all metadata keys combined cannot exceed this
  */
 export const METADATA_SIZE_LIMIT = 16 * 1024; // 16KB in bytes
 
@@ -102,4 +102,28 @@ export function getMonthMetadataStats(
   });
 
   return stats;
+}
+
+/**
+ * Calculate total metadata usage across all keys
+ * (config + all log buckets combined)
+ */
+export function getTotalMetadataUsage(
+  config: CalendarConfig,
+  logs: CalendarLogs
+): { sizeBytes: number; usagePercentage: number } {
+  // Calculate config size
+  const configSize = calculateDataSize(config);
+
+  // Calculate total logs size (all buckets combined)
+  const logsSize = calculateDataSize(logs);
+
+  // Total size
+  const totalSize = configSize + logsSize;
+  const usagePercentage = calculateUsagePercentage(totalSize);
+
+  return {
+    sizeBytes: totalSize,
+    usagePercentage
+  };
 }
