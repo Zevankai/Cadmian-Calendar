@@ -110,10 +110,25 @@ export const useCalendar = () => {
           }
         }
 
-        // For players, wait for GM to create config
+        // For players, retry reading config if not found (items might be syncing)
         if (!loadedConfig && playerRole === 'PLAYER') {
-          console.log('[Calendar] Player mode: using default config until GM creates one');
-          loadedConfig = DEFAULT_CONFIG;
+          console.log('[Calendar] Player mode: config not found, retrying...');
+
+          // Retry up to 3 times with 500ms delay
+          for (let attempt = 1; attempt <= 3 && !loadedConfig; attempt++) {
+            console.log(`[Calendar] Retry attempt ${attempt}/3...`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            loadedConfig = await readConfig();
+            if (loadedConfig) {
+              console.log('[Calendar] Config found on retry!');
+              allLogs = await readAllLogs();
+            }
+          }
+
+          if (!loadedConfig) {
+            console.log('[Calendar] No config found after retries, using default');
+            loadedConfig = DEFAULT_CONFIG;
+          }
         }
 
         if (active) {
