@@ -527,12 +527,26 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
 
         <button className="btn-danger" style={{ width: '100%', padding: '10px', border: '1px solid #f55', color: '#f55' }} onClick={async () => {
             if (confirm("ARE YOU SURE? This will wipe ALL calendar data, logs, and settings permanently.")) {
+                // Delete all calendar scene items
+                const allItems = await OBR.scene.items.getItems();
+                const calendarItemIds = allItems
+                    .filter(item => item.id.startsWith('com.username.calendar-'))
+                    .map(item => item.id);
+
+                if (calendarItemIds.length > 0) {
+                    await OBR.scene.items.deleteItems(calendarItemIds);
+                }
+
+                // Also delete any old room metadata (for cleanup)
                 const metadata = await OBR.room.getMetadata();
                 const keysToDelete: Record<string, undefined> = {};
                 Object.keys(metadata).forEach(key => {
                     if (key.startsWith('com.username.calendar')) keysToDelete[key] = undefined;
                 });
-                await OBR.room.setMetadata(keysToDelete);
+                if (Object.keys(keysToDelete).length > 0) {
+                    await OBR.room.setMetadata(keysToDelete);
+                }
+
                 window.location.reload();
             }
         }}>☢ NUKE ALL CALENDAR DATA</button>

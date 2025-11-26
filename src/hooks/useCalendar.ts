@@ -149,13 +149,41 @@ export const useCalendar = () => {
 
           if (calendarItems.length === 0) return;
 
-          console.log('[Calendar] Calendar items changed, reloading...');
-          // Reload config and logs when calendar items change
-          const newConfig = await readConfig();
-          const newLogs = await readAllLogs();
+          console.log('[Calendar] Calendar items changed, reloading...', {
+            changedItemIds: calendarItems.map(i => i.id),
+            playerRole: playerRole
+          });
 
-          if (newConfig) setConfig(newConfig);
-          setLogs(newLogs);
+          try {
+            // Use the updated items directly from the callback when possible
+            const configItem = calendarItems.find(item => item.id === 'com.username.calendar-config-item');
+
+            let newConfig: CalendarConfig | null = null;
+            if (configItem && configItem.metadata['calendar.config']) {
+              newConfig = configItem.metadata['calendar.config'] as CalendarConfig;
+              console.log('[Calendar] Config loaded from onChange callback');
+            } else {
+              // Fallback: read from scene
+              await new Promise(resolve => setTimeout(resolve, 150));
+              newConfig = await readConfig();
+              console.log('[Calendar] Config loaded from scene read');
+            }
+
+            // Always re-read logs to get all buckets
+            const newLogs = await readAllLogs();
+
+            console.log('[Calendar] Reloaded data:', {
+              configFound: !!newConfig,
+              logsCount: newLogs.length
+            });
+
+            if (newConfig) {
+              setConfig(newConfig);
+            }
+            setLogs(newLogs);
+          } catch (error) {
+            console.error('[Calendar] Error reloading after onChange:', error);
+          }
         });
 
         console.log('[Calendar] Setup complete!');
