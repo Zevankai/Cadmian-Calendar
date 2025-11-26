@@ -78,12 +78,15 @@ export async function getOrCreateLogsItem(year: number, monthIndex: number): Pro
 }
 
 /**
- * Read calendar config from item metadata
+ * Read calendar config from item metadata (read-only, does not create items)
  */
 export async function readConfig(): Promise<CalendarConfig | null> {
   try {
-    const item = await getOrCreateConfigItem();
-    const metadata = item.metadata;
+    const items = await OBR.scene.items.getItems((item) => item.id === CALENDAR_CONFIG_ITEM_ID);
+    if (items.length === 0) {
+      return null;
+    }
+    const metadata = items[0].metadata;
     return (metadata[ITEM_METADATA_KEY_CONFIG] as CalendarConfig) || null;
   } catch (error) {
     console.error('Error reading config from item:', error);
@@ -105,12 +108,16 @@ export async function writeConfig(config: CalendarConfig): Promise<void> {
 }
 
 /**
- * Read logs for a specific month/year from item metadata
+ * Read logs for a specific month/year from item metadata (read-only, does not create items)
  */
 export async function readLogs(year: number, monthIndex: number): Promise<CalendarLogs> {
   try {
-    const item = await getOrCreateLogsItem(year, monthIndex);
-    const metadata = item.metadata;
+    const itemId = getLogsItemId(year, monthIndex);
+    const items = await OBR.scene.items.getItems((item) => item.id === itemId);
+    if (items.length === 0) {
+      return [];
+    }
+    const metadata = items[0].metadata;
     return (metadata[ITEM_METADATA_KEY_LOGS] as CalendarLogs) || [];
   } catch (error) {
     console.error(`Error reading logs for ${year}-${monthIndex}:`, error);
