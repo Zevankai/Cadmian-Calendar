@@ -9,6 +9,11 @@ const CALENDAR_CONFIG_ITEM_ID = 'com.username.calendar-config-item';
 const CALENDAR_LOGS_ITEM_PREFIX = 'com.username.calendar-logs-item';
 
 /**
+ * Prefix used to identify all calendar items (config and logs)
+ */
+export const CALENDAR_ITEM_PREFIX = 'com.username.calendar-';
+
+/**
  * Metadata keys for items
  */
 const ITEM_METADATA_KEY_CONFIG = 'calendar.config';

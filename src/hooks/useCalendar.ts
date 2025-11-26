@@ -22,8 +22,13 @@ import {
   writeConfig,
   readAllLogs,
   writeLogs,
-  readLogs
+  readLogs,
+  CALENDAR_ITEM_PREFIX
 } from '../utils/itemStorage';
+
+// Retry configuration for player sync
+const PLAYER_SYNC_MAX_RETRIES = 5;
+const PLAYER_SYNC_BASE_DELAY_MS = 500;
 
 export const useCalendar = () => {
   const [config, setConfig] = useState<CalendarConfig | null>(null);
@@ -57,7 +62,7 @@ export const useCalendar = () => {
 
           // Check if any calendar items exist in the scene
           const calendarItems = items.filter(item =>
-            item.id.startsWith('com.username.calendar-')
+            item.id.startsWith(CALENDAR_ITEM_PREFIX)
           );
 
           // Always try to reload config if calendar items exist
@@ -67,8 +72,8 @@ export const useCalendar = () => {
             const newConfig = await readConfig();
             const newLogs = await readAllLogs();
 
-            // Only update if we got valid data (prevents overwriting with null)
-            if (active && newConfig) {
+            // Only update if we got valid data (prevents overwriting with null/undefined)
+            if (active && newConfig && newLogs) {
               setConfig(newConfig);
               setLogs(newLogs);
               // Mark as ready if not already
@@ -141,10 +146,10 @@ export const useCalendar = () => {
         if (!loadedConfig && playerRole === 'PLAYER') {
           console.log('[Calendar] Player mode: config not found, waiting for GM config...');
 
-          // Retry up to 5 times with increasing delay for better sync reliability
-          for (let attempt = 1; attempt <= 5 && !loadedConfig; attempt++) {
-            const delay = attempt * 500; // 500ms, 1000ms, 1500ms, 2000ms, 2500ms
-            console.log(`[Calendar] Retry attempt ${attempt}/5 (waiting ${delay}ms)...`);
+          // Retry with increasing delay for better sync reliability
+          for (let attempt = 1; attempt <= PLAYER_SYNC_MAX_RETRIES && !loadedConfig; attempt++) {
+            const delay = attempt * PLAYER_SYNC_BASE_DELAY_MS;
+            console.log(`[Calendar] Retry attempt ${attempt}/${PLAYER_SYNC_MAX_RETRIES} (waiting ${delay}ms)...`);
             await new Promise(resolve => setTimeout(resolve, delay));
             loadedConfig = await readConfig();
             if (loadedConfig) {
