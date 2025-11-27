@@ -22,8 +22,13 @@ import {
   writeConfig,
   readAllLogs,
   writeLogs,
-  readLogs
+  readLogs,
+  CALENDAR_ITEM_PREFIX
 } from '../utils/itemStorage';
+
+// Retry configuration for player sync
+const PLAYER_SYNC_MAX_RETRIES = 5;
+const PLAYER_SYNC_BASE_DELAY_MS = 500;
 
 export const useCalendar = () => {
   const [config, setConfig] = useState<CalendarConfig | null>(null);
@@ -50,7 +55,34 @@ export const useCalendar = () => {
         await OBR.scene.isReady();
         console.log('[Calendar] Scene is ready!');
 
-        // 1. Try reading from item metadata
+        // 1. Set up the listener FIRST - this ensures we catch any changes during setup
+        // and also provides initial sync when subscription fires immediately
+        unsubscribeItems = OBR.scene.items.onChange(async (items) => {
+          if (!active) return;
+
+          // Check if any calendar items exist in the scene
+          const calendarItems = items.filter(item =>
+            item.id.startsWith(CALENDAR_ITEM_PREFIX)
+          );
+
+          // Always try to reload config if calendar items exist
+          // This handles both initial sync and subsequent updates
+          if (calendarItems.length > 0) {
+            console.log('[Calendar] Calendar items detected, syncing...');
+            const newConfig = await readConfig();
+            const newLogs = await readAllLogs();
+
+            // Only update if we got valid data (prevents overwriting with null/undefined)
+            if (active && newConfig && newLogs) {
+              setConfig(newConfig);
+              setLogs(newLogs);
+              // Mark as ready if not already
+              setReady(true);
+            }
+          }
+        });
+
+        // 2. Try reading from item metadata
         console.log('[Calendar] Reading config from items...');
         let loadedConfig = await readConfig();
         console.log('[Calendar] Config loaded:', loadedConfig ? 'Found' : 'Not found');
@@ -59,7 +91,7 @@ export const useCalendar = () => {
         let allLogs = await readAllLogs();
         console.log('[Calendar] Logs loaded:', allLogs.length, 'events');
 
-        // 2. Migration: If no item config found, check room metadata
+        // 3. Migration: If no item config found and GM, check room metadata
         if (!loadedConfig && playerRole === 'GM') {
           console.log('[Calendar] No config found, checking room metadata for migration...');
           const roomMetadata = await OBR.room.getMetadata();
@@ -103,21 +135,22 @@ export const useCalendar = () => {
             allLogs = roomLogs;
             console.log('[Calendar] Migration complete!');
           } else {
-            // No existing data, create new
+            // No existing data, GM creates new default config
             console.log('[Calendar] No existing data, creating default config...');
             loadedConfig = DEFAULT_CONFIG;
             await writeConfig(DEFAULT_CONFIG);
           }
         }
 
-        // For players, retry reading config if not found (items might be syncing)
+        // 4. For players, if config not found, wait longer for GM's config to sync
         if (!loadedConfig && playerRole === 'PLAYER') {
-          console.log('[Calendar] Player mode: config not found, retrying...');
+          console.log('[Calendar] Player mode: config not found, waiting for GM config...');
 
-          // Retry up to 3 times with 500ms delay
-          for (let attempt = 1; attempt <= 3 && !loadedConfig; attempt++) {
-            console.log(`[Calendar] Retry attempt ${attempt}/3...`);
-            await new Promise(resolve => setTimeout(resolve, 500));
+          // Retry with increasing delay for better sync reliability
+          for (let attempt = 1; attempt <= PLAYER_SYNC_MAX_RETRIES && !loadedConfig; attempt++) {
+            const delay = attempt * PLAYER_SYNC_BASE_DELAY_MS;
+            console.log(`[Calendar] Retry attempt ${attempt}/${PLAYER_SYNC_MAX_RETRIES} (waiting ${delay}ms)...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
             loadedConfig = await readConfig();
             if (loadedConfig) {
               console.log('[Calendar] Config found on retry!');
@@ -126,37 +159,18 @@ export const useCalendar = () => {
           }
 
           if (!loadedConfig) {
-            console.log('[Calendar] No config found after retries, using default');
+            console.log('[Calendar] No config found after retries, using default (GM may not have set up calendar yet)');
             loadedConfig = DEFAULT_CONFIG;
           }
         }
 
+        // 5. Set initial state and mark as ready
         if (active) {
           console.log('[Calendar] Setting state and marking as ready');
           setConfig(loadedConfig || DEFAULT_CONFIG);
           setLogs(allLogs);
           setReady(true);
         }
-
-        // 3. Listen for scene item changes (our calendar items)
-        unsubscribeItems = OBR.scene.items.onChange(async (items) => {
-          if (!active) return;
-
-          // Check if any calendar items changed
-          const calendarItems = items.filter(item =>
-            item.id.startsWith('com.username.calendar-')
-          );
-
-          if (calendarItems.length === 0) return;
-
-          console.log('[Calendar] Calendar items changed, reloading...');
-          // Reload config and logs when calendar items change
-          const newConfig = await readConfig();
-          const newLogs = await readAllLogs();
-
-          if (newConfig) setConfig(newConfig);
-          setLogs(newLogs);
-        });
 
         console.log('[Calendar] Setup complete!');
       } catch (error) {
