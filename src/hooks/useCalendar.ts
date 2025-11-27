@@ -30,22 +30,27 @@ import {
 const PLAYER_SYNC_MAX_RETRIES = 5;
 const PLAYER_SYNC_BASE_DELAY_MS = 500;
 
+// Retry configuration for player waiting state
+const PLAYER_WAITING_RETRY_INTERVAL_MS = 2500;
+
 export const useCalendar = () => {
   const [config, setConfig] = useState<CalendarConfig | null>(null);
   const [logs, setLogs] = useState<CalendarLogs>([]);
   const [role, setRole] = useState<'GM' | 'PLAYER'>('PLAYER');
   const [ready, setReady] = useState(false);
+  const [waitingForGM, setWaitingForGM] = useState(false);
 
   useEffect(() => {
     let active = true;
     let unsubscribeItems: (() => void) | undefined;
+    let playerRole: 'GM' | 'PLAYER' = 'PLAYER';
 
     const setup = async () => {
       try {
         await new Promise<void>(resolve => OBR.onReady(() => resolve()));
         if (!active) return;
 
-        const playerRole = await OBR.player.getRole();
+        playerRole = await OBR.player.getRole();
         if (active) setRole(playerRole);
 
         console.log('[Calendar] Starting setup...');
@@ -159,8 +164,35 @@ export const useCalendar = () => {
           }
 
           if (!loadedConfig) {
-            console.log('[Calendar] No config found after retries, using default (GM may not have set up calendar yet)');
-            loadedConfig = DEFAULT_CONFIG;
+            // Instead of using default, enter waiting state and continue retrying
+            console.log('[Calendar] No config found after retries, entering waiting state for GM');
+            if (active) {
+              setWaitingForGM(true);
+              setReady(true);
+            }
+
+            // Start background retry loop for players waiting for GM
+            const retryForGMConfig = async () => {
+              while (active) {
+                await new Promise(resolve => setTimeout(resolve, PLAYER_WAITING_RETRY_INTERVAL_MS));
+                if (!active) return;
+
+                console.log('[Calendar] Retrying to fetch GM config...');
+                const gmConfig = await readConfig();
+                if (gmConfig) {
+                  console.log('[Calendar] GM config found!');
+                  const gmLogs = await readAllLogs();
+                  if (active) {
+                    setConfig(gmConfig);
+                    setLogs(gmLogs);
+                    setWaitingForGM(false);
+                  }
+                  return;
+                }
+              }
+            };
+            retryForGMConfig();
+            return; // Exit setup early, we're now in waiting state
           }
         }
 
@@ -175,12 +207,18 @@ export const useCalendar = () => {
         console.log('[Calendar] Setup complete!');
       } catch (error) {
         console.error('[Calendar] Error during setup:', error);
-        // Even if there's an error, set ready to true with default config
-        // so the extension doesn't get stuck on loading
+        // For GMs, set ready to true with default config so they can create the calendar
+        // For players, set waiting state instead of using default config
         if (active) {
-          setConfig(DEFAULT_CONFIG);
-          setLogs([]);
-          setReady(true);
+          if (playerRole === 'GM') {
+            setConfig(DEFAULT_CONFIG);
+            setLogs([]);
+            setReady(true);
+          } else {
+            // Players should wait for GM instead of using default
+            setWaitingForGM(true);
+            setReady(true);
+          }
         }
       }
     };
@@ -274,7 +312,7 @@ export const useCalendar = () => {
   };
 
   return {
-    ready, role, config, logs, isGM: role === 'GM',
+    ready, role, config, logs, isGM: role === 'GM', waitingForGM,
     actions: { updateConfig, updateTime, setExactDate, updateWeather, addLog, deleteLog }
   };
 };

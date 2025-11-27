@@ -12,7 +12,7 @@ import { getThemeColors, applyTheme } from './utils/theme';
 
 function App() {
   // FIXED: Removed 'role' from this line
-  const { ready, config, logs, isGM, actions } = useCalendar();
+  const { ready, config, logs, isGM, waitingForGM, actions } = useCalendar();
 
   const [viewDate, setViewDate] = useState<DateTimeState | null>(null);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
@@ -36,7 +36,19 @@ function App() {
     }
   }, [config]);
 
-  if (!ready || !config || !viewDate) return <div className="loading">Loading...</div>;
+  if (!ready) return <div className="loading">Loading...</div>;
+
+  // Show waiting message for players when GM hasn't set up the calendar yet
+  if (waitingForGM) {
+    return (
+      <div className="loading" style={{ textAlign: 'center', padding: '40px' }}>
+        <div style={{ marginBottom: '16px', fontSize: '1.2rem' }}>Waiting for GM to set up calendar...</div>
+        <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>The calendar will appear once the GM creates it.</div>
+      </div>
+    );
+  }
+
+  if (!config || !viewDate) return <div className="loading">Loading...</div>;
 
   const moonPhase = getMoonPhase(config, config.currentDate.year, config.currentDate.monthIndex, config.currentDate.day);
 
