@@ -194,3 +194,33 @@ export async function deleteAllCalendarItems(): Promise<void> {
     await OBR.scene.items.deleteItems(calendarItemIds);
   }
 }
+
+/**
+ * Extract calendar config directly from an array of items (for use in onChange callback)
+ * This avoids race conditions by reading from the items passed to the callback
+ * rather than making separate API calls.
+ */
+export function extractConfigFromItems(items: Item[]): CalendarConfig | null {
+  const configItem = items.find(item => item.id === CALENDAR_CONFIG_ITEM_ID);
+  if (!configItem) {
+    return null;
+  }
+  return (configItem.metadata[ITEM_METADATA_KEY_CONFIG] as CalendarConfig) || null;
+}
+
+/**
+ * Extract all logs directly from an array of items (for use in onChange callback)
+ * This avoids race conditions by reading from the items passed to the callback
+ * rather than making separate API calls.
+ */
+export function extractLogsFromItems(items: Item[]): CalendarLogs {
+  const logsItems = items.filter(item => item.id.startsWith(CALENDAR_LOGS_ITEM_PREFIX));
+  const allLogs: CalendarLogs = [];
+
+  for (const item of logsItems) {
+    const logs = (item.metadata[ITEM_METADATA_KEY_LOGS] as CalendarLogs) || [];
+    allLogs.push(...logs);
+  }
+
+  return allLogs;
+}
