@@ -173,7 +173,7 @@ export const useCalendar = () => {
 
             // Start background retry loop for players waiting for GM
             const retryForGMConfig = async () => {
-              while (active && !loadedConfig) {
+              while (active) {
                 await new Promise(resolve => setTimeout(resolve, PLAYER_WAITING_RETRY_INTERVAL_MS));
                 if (!active) return;
 
