@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import OBR from '@owlbear-rodeo/sdk';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -23,7 +23,9 @@ import {
   readAllLogs,
   writeLogs,
   readLogs,
-  CALENDAR_ITEM_PREFIX
+  CALENDAR_ITEM_PREFIX,
+  extractConfigFromItems,
+  extractLogsFromItems
 } from '../utils/itemStorage';
 
 // Retry configuration for player sync
@@ -39,6 +41,10 @@ export const useCalendar = () => {
   const [role, setRole] = useState<'GM' | 'PLAYER'>('PLAYER');
   const [ready, setReady] = useState(false);
   const [waitingForGM, setWaitingForGM] = useState(false);
+
+  // Track previous config/logs JSON strings to detect actual changes
+  const prevConfigJsonRef = useRef<string | null>(null);
+  const prevLogsJsonRef = useRef<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -62,7 +68,7 @@ export const useCalendar = () => {
 
         // 1. Set up the listener FIRST - this ensures we catch any changes during setup
         // and also provides initial sync when subscription fires immediately
-        unsubscribeItems = OBR.scene.items.onChange(async (items) => {
+        unsubscribeItems = OBR.scene.items.onChange((items) => {
           if (!active) return;
 
           // Check if any calendar items exist in the scene
@@ -70,19 +76,54 @@ export const useCalendar = () => {
             item.id.startsWith(CALENDAR_ITEM_PREFIX)
           );
 
-          // Always try to reload config if calendar items exist
-          // This handles both initial sync and subsequent updates
-          if (calendarItems.length > 0) {
-            console.log('[Calendar] Calendar items detected, syncing...');
-            const newConfig = await readConfig();
-            const newLogs = await readAllLogs();
+          // Only process if calendar items exist
+          if (calendarItems.length === 0) {
+            return;
+          }
 
-            // Only update if we got valid data (prevents overwriting with null/undefined)
-            if (active && newConfig && newLogs) {
-              setConfig(newConfig);
-              setLogs(newLogs);
-              // Mark as ready if not already
+          // Extract config and logs directly from the items passed to the callback
+          // This avoids race conditions from making separate API calls
+          const newConfig = extractConfigFromItems(items);
+          const newLogs = extractLogsFromItems(items);
+
+          // Only update if we have valid config. Config is required, but logs can be empty.
+          // extractLogsFromItems returns [] if no log items exist, which is valid.
+          if (!newConfig) {
+            return;
+          }
+
+          // Use JSON comparison to detect actual changes.
+          // Note: JSON.stringify is called on every onChange event but is acceptable
+          // for typical calendar data sizes. For very large datasets, consider
+          // implementing a hash-based approach.
+          const newConfigJson = JSON.stringify(newConfig);
+          const newLogsJson = JSON.stringify(newLogs);
+
+          const configChanged = newConfigJson !== prevConfigJsonRef.current;
+          const logsChanged = newLogsJson !== prevLogsJsonRef.current;
+
+          // Only update state if something actually changed
+          if (configChanged || logsChanged) {
+            console.log('[Calendar] Calendar data changed, syncing...', {
+              configChanged,
+              logsChanged
+            });
+
+            // Update refs to track current state
+            prevConfigJsonRef.current = newConfigJson;
+            prevLogsJsonRef.current = newLogsJson;
+
+            if (active) {
+              if (configChanged) {
+                setConfig(newConfig);
+              }
+              if (logsChanged) {
+                setLogs(newLogs);
+              }
+              // Mark as ready if not already (for initial sync)
               setReady(true);
+              // Clear waiting state if we receive config
+              setWaitingForGM(false);
             }
           }
         });
@@ -186,6 +227,9 @@ export const useCalendar = () => {
                     setConfig(gmConfig);
                     setLogs(gmLogs);
                     setWaitingForGM(false);
+                    // Update refs for change detection
+                    prevConfigJsonRef.current = JSON.stringify(gmConfig);
+                    prevLogsJsonRef.current = JSON.stringify(gmLogs);
                   }
                   return;
                 }
@@ -199,9 +243,14 @@ export const useCalendar = () => {
         // 5. Set initial state and mark as ready
         if (active) {
           console.log('[Calendar] Setting state and marking as ready');
-          setConfig(loadedConfig || DEFAULT_CONFIG);
+          const initialConfig = loadedConfig || DEFAULT_CONFIG;
+          setConfig(initialConfig);
           setLogs(allLogs);
           setReady(true);
+
+          // Initialize refs for change detection
+          prevConfigJsonRef.current = JSON.stringify(initialConfig);
+          prevLogsJsonRef.current = JSON.stringify(allLogs);
         }
 
         console.log('[Calendar] Setup complete!');
@@ -214,6 +263,9 @@ export const useCalendar = () => {
             setConfig(DEFAULT_CONFIG);
             setLogs([]);
             setReady(true);
+            // Initialize refs for change detection
+            prevConfigJsonRef.current = JSON.stringify(DEFAULT_CONFIG);
+            prevLogsJsonRef.current = JSON.stringify([]);
           } else {
             // Players should wait for GM instead of using default
             setWaitingForGM(true);
