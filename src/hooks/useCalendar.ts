@@ -86,12 +86,16 @@ export const useCalendar = () => {
           const newConfig = extractConfigFromItems(items);
           const newLogs = extractLogsFromItems(items);
 
-          // Only update if we got valid data (prevents overwriting with null/undefined)
+          // Only update if we have valid config. Config is required, but logs can be empty.
+          // extractLogsFromItems returns [] if no log items exist, which is valid.
           if (!newConfig) {
             return;
           }
 
-          // Use JSON comparison to detect actual changes
+          // Use JSON comparison to detect actual changes.
+          // Note: JSON.stringify is called on every onChange event but is acceptable
+          // for typical calendar data sizes. For very large datasets, consider
+          // implementing a hash-based approach.
           const newConfigJson = JSON.stringify(newConfig);
           const newLogsJson = JSON.stringify(newLogs);
 
