@@ -1,20 +1,25 @@
 import React, { useState, useRef } from 'react';
 import OBR from '@owlbear-rodeo/sdk';
-import type { CalendarConfig, MonthBanner, SeasonName, BiomeType, DateTimeState, CalendarLogs } from '../types';
+import type { CalendarConfig, MonthBanner, SeasonName, BiomeType, DateTimeState, CalendarLogs, MonthYearMetadata } from '../types';
 import { METADATA_KEY_CONFIG, METADATA_PREFIX_LOGS } from '../types';
 import { getMonthMetadataStats, formatBytes, getUsageColor, calculateDataSize, calculateUsagePercentage } from '../utils/metadataStats';
 
 interface SettingsProps {
   config: CalendarConfig;
   logs: CalendarLogs;
+  viewDate: DateTimeState;
+  currentMonthMeta: MonthYearMetadata | null;
   onSave: (newConfig: CalendarConfig) => void;
+  onUpdateMonthMetadata: (year: number, monthIndex: number, metadata: MonthYearMetadata) => Promise<void>;
   onCancel: () => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCancel }) => {
+export const Settings: React.FC<SettingsProps> = ({ config, logs, viewDate, currentMonthMeta, onSave, onUpdateMonthMetadata, onCancel }) => {
   const [localConfig, setLocalConfig] = useState<CalendarConfig>(JSON.parse(JSON.stringify(config)));
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [expandedBannerIndex, setExpandedBannerIndex] = useState<number | null>(null);
+  
+  // Local state for banner editing (for the currently viewed month/year)
+  const [localBanner, setLocalBanner] = useState<MonthBanner | undefined>(currentMonthMeta?.banner);
 
   // --- ARCHIVING HELPERS ---
 
@@ -233,11 +238,6 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
     newMonths[index] = { ...newMonths[index], [field]: value };
     setLocalConfig({ ...localConfig, months: newMonths });
   };
-  const handleBannerChange = (index: number, banner: MonthBanner | undefined) => {
-    const newMonths = [...localConfig.months];
-    newMonths[index] = { ...newMonths[index], banner };
-    setLocalConfig({ ...localConfig, months: newMonths });
-  };
   const removeWeekDay = (index: number) => {
     const newDays = localConfig.weekDays.filter((_, i) => i !== index);
     setLocalConfig({ ...localConfig, weekDays: newDays });
@@ -249,6 +249,16 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
     const newWeek = [...localConfig.weekDays];
     newWeek[index] = { name: value };
     setLocalConfig({ ...localConfig, weekDays: newWeek });
+  };
+  
+  // --- BANNER HELPERS (for current month/year) ---
+  const handleSaveBanner = async () => {
+    await onUpdateMonthMetadata(viewDate.year, viewDate.monthIndex, { banner: localBanner });
+  };
+  
+  const handleClearBanner = async () => {
+    setLocalBanner(undefined);
+    await onUpdateMonthMetadata(viewDate.year, viewDate.monthIndex, { banner: undefined });
   };
 
   return (
@@ -441,6 +451,159 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
         </div>
       </div>
 
+      {/* --- CURRENT MONTH BANNER --- */}
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.08)',
+        backdropFilter: 'blur(8px)',
+        padding: '12px',
+        borderRadius: '12px',
+        marginBottom: '1.5rem',
+        border: '1px solid rgba(255, 255, 255, 0.15)',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
+      }}>
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#fbbf24' }}>
+          Banner for {localConfig.months[viewDate.monthIndex]?.name || 'Month'} {viewDate.year}
+        </h3>
+        <div style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: '12px' }}>
+          Configure a banner image specific to this month/year combination.
+        </div>
+        
+        {/* URL Input */}
+        <div style={{ marginBottom: '10px' }}>
+          <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'block', marginBottom: '4px' }}>Image URL</label>
+          <input 
+            className="settings-input" 
+            placeholder="https://example.com/image.jpg"
+            value={localBanner?.url || ''} 
+            onChange={(e) => {
+              const url = e.target.value;
+              if (url) {
+                setLocalBanner({
+                  url,
+                  positionX: localBanner?.positionX ?? 50,
+                  positionY: localBanner?.positionY ?? 50,
+                  zoom: localBanner?.zoom ?? 1
+                });
+              } else {
+                setLocalBanner(undefined);
+              }
+            }}
+          />
+        </div>
+
+        {localBanner && localBanner.url && (
+          <>
+            {/* Position X Slider */}
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span>Horizontal Position</span>
+                <span>{localBanner.positionX}%</span>
+              </label>
+              <input 
+                type="range" 
+                min="0" 
+                max="100" 
+                value={localBanner.positionX}
+                onChange={(e) => setLocalBanner({ ...localBanner, positionX: parseInt(e.target.value) })}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+            </div>
+
+            {/* Position Y Slider */}
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span>Vertical Position</span>
+                <span>{localBanner.positionY}%</span>
+              </label>
+              <input 
+                type="range" 
+                min="0" 
+                max="100" 
+                value={localBanner.positionY}
+                onChange={(e) => setLocalBanner({ ...localBanner, positionY: parseInt(e.target.value) })}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+            </div>
+
+            {/* Zoom Slider */}
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span>Zoom</span>
+                <span>{localBanner.zoom.toFixed(1)}x</span>
+              </label>
+              <input 
+                type="range" 
+                min="0.5" 
+                max="2" 
+                step="0.1"
+                value={localBanner.zoom}
+                onChange={(e) => setLocalBanner({ ...localBanner, zoom: parseFloat(e.target.value) })}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+            </div>
+
+            {/* Preview */}
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'block', marginBottom: '4px' }}>Preview</label>
+              <div style={{
+                width: '100%',
+                height: '80px',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                position: 'relative',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
+              }}>
+                <img 
+                  src={localBanner.url}
+                  alt="Banner preview"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: `${localBanner.positionX}% ${localBanner.positionY}%`,
+                    transform: `scale(${localBanner.zoom})`,
+                    transformOrigin: `${localBanner.positionX}% ${localBanner.positionY}%`
+                  }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+                {/* Gradient overlay */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: '40%',
+                  background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)',
+                  pointerEvents: 'none'
+                }} />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Save and Clear Buttons */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button 
+            onClick={handleSaveBanner}
+            className="btn-primary"
+            style={{ flex: 1, padding: '8px' }}
+          >
+            Save Banner
+          </button>
+          {localBanner && (
+            <button 
+              onClick={handleClearBanner}
+              className="btn-danger"
+              style={{ padding: '8px' }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* --- GLOBAL CONFIG --- */}
       <h3 style={{ fontSize: '0.9rem', marginTop: '10px', marginBottom: '5px' }}>World Config</h3>
       <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -496,7 +659,7 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
             overflow: 'hidden'
           }}>
             {/* Main month row */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 70px 100px 40px 40px', gap: '8px', alignItems: 'center', padding: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 70px 100px 40px', gap: '8px', alignItems: 'center', padding: '8px' }}>
               <input className="settings-input" placeholder="Name" value={month.name} onChange={(e) => handleMonthChange(idx, 'name', e.target.value)} />
               <input className="settings-input" placeholder="Days" type="number" value={month.days} onChange={(e) => handleMonthChange(idx, 'days', parseInt(e.target.value))} />
               <select className="settings-input" value={month.season} onChange={(e) => handleMonthChange(idx, 'season', e.target.value as SeasonName)}>
@@ -505,161 +668,8 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
                 <option value="Summer">Summer</option>
                 <option value="Fall">Fall</option>
               </select>
-              <button 
-                onClick={() => setExpandedBannerIndex(expandedBannerIndex === idx ? null : idx)} 
-                className="btn-secondary"
-                style={{ 
-                  padding: '6px',
-                  fontSize: '0.7rem',
-                  background: month.banner ? 'rgba(100, 200, 100, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                  borderColor: month.banner ? 'rgba(100, 200, 100, 0.4)' : 'rgba(255, 255, 255, 0.2)'
-                }}
-                title="Configure banner"
-              >
-                🖼️
-              </button>
               <button onClick={() => removeMonth(idx)} className="btn-danger">X</button>
             </div>
-            
-            {/* Expanded banner configuration */}
-            {expandedBannerIndex === idx && (
-              <div style={{ 
-                padding: '12px', 
-                background: 'rgba(0, 0, 0, 0.2)',
-                borderTop: '1px solid rgba(255, 255, 255, 0.1)'
-              }}>
-                <div style={{ fontSize: '0.8rem', color: '#7dd3fc', marginBottom: '10px', fontWeight: '600' }}>
-                  Banner Configuration
-                </div>
-                
-                {/* URL Input */}
-                <div style={{ marginBottom: '10px' }}>
-                  <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'block', marginBottom: '4px' }}>Image URL</label>
-                  <input 
-                    className="settings-input" 
-                    placeholder="https://example.com/image.jpg"
-                    value={month.banner?.url || ''} 
-                    onChange={(e) => {
-                      const url = e.target.value;
-                      if (url) {
-                        handleBannerChange(idx, {
-                          url,
-                          positionX: month.banner?.positionX ?? 50,
-                          positionY: month.banner?.positionY ?? 50,
-                          zoom: month.banner?.zoom ?? 1
-                        });
-                      } else {
-                        handleBannerChange(idx, undefined);
-                      }
-                    }}
-                  />
-                </div>
-
-                {month.banner && (() => {
-                  const banner = month.banner;
-                  return (
-                    <>
-                      {/* Position X Slider */}
-                      <div style={{ marginBottom: '10px' }}>
-                        <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span>Horizontal Position</span>
-                          <span>{banner.positionX}%</span>
-                        </label>
-                        <input 
-                          type="range" 
-                          min="0" 
-                          max="100" 
-                          value={banner.positionX}
-                          onChange={(e) => handleBannerChange(idx, { ...banner, positionX: parseInt(e.target.value) })}
-                          style={{ width: '100%', cursor: 'pointer' }}
-                        />
-                      </div>
-
-                      {/* Position Y Slider */}
-                      <div style={{ marginBottom: '10px' }}>
-                        <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span>Vertical Position</span>
-                          <span>{banner.positionY}%</span>
-                        </label>
-                        <input 
-                          type="range" 
-                          min="0" 
-                          max="100" 
-                          value={banner.positionY}
-                          onChange={(e) => handleBannerChange(idx, { ...banner, positionY: parseInt(e.target.value) })}
-                          style={{ width: '100%', cursor: 'pointer' }}
-                        />
-                      </div>
-
-                      {/* Zoom Slider */}
-                      <div style={{ marginBottom: '10px' }}>
-                        <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span>Zoom</span>
-                          <span>{banner.zoom.toFixed(1)}x</span>
-                        </label>
-                        <input 
-                          type="range" 
-                          min="0.5" 
-                          max="2" 
-                          step="0.1"
-                          value={banner.zoom}
-                          onChange={(e) => handleBannerChange(idx, { ...banner, zoom: parseFloat(e.target.value) })}
-                          style={{ width: '100%', cursor: 'pointer' }}
-                        />
-                      </div>
-
-                      {/* Preview */}
-                      <div style={{ marginBottom: '10px' }}>
-                        <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'block', marginBottom: '4px' }}>Preview</label>
-                        <div style={{
-                          width: '100%',
-                          height: '80px',
-                          borderRadius: '8px',
-                          overflow: 'hidden',
-                          position: 'relative',
-                          border: '1px solid rgba(255, 255, 255, 0.2)'
-                        }}>
-                          <img 
-                            src={banner.url}
-                            alt="Banner preview"
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
-                              objectPosition: `${banner.positionX}% ${banner.positionY}%`,
-                              transform: `scale(${banner.zoom})`,
-                              transformOrigin: `${banner.positionX}% ${banner.positionY}%`
-                            }}
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                          {/* Gradient overlay */}
-                          <div style={{
-                            position: 'absolute',
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            height: '40%',
-                            background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)',
-                            pointerEvents: 'none'
-                          }} />
-                        </div>
-                      </div>
-
-                      {/* Clear Button */}
-                      <button 
-                        onClick={() => handleBannerChange(idx, undefined)}
-                        className="btn-danger"
-                        style={{ width: '100%', padding: '8px' }}
-                      >
-                        Clear Banner
-                      </button>
-                    </>
-                  );
-                })()}
-              </div>
-            )}
           </div>
         ))}
         <button onClick={addMonth} className="btn-secondary">+ Add Month</button>

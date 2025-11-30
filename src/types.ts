@@ -37,7 +37,13 @@ export interface MonthConfig {
   name: string;
   days: number;
   season: SeasonName;
-  banner?: MonthBanner;           // Optional banner image configuration
+}
+
+/**
+ * Metadata specific to a month/year combination (stored per month/year item)
+ */
+export interface MonthYearMetadata {
+  banner?: MonthBanner;
 }
 
 export interface WeekDayConfig {

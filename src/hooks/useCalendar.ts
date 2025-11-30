@@ -11,7 +11,8 @@ import type {
   CalendarLogs,
   CalendarLog,
   DateTimeState,
-  EventCategory
+  EventCategory,
+  MonthYearMetadata
 } from '../types';
 
 import { DEFAULT_CONFIG } from '../defaultData';
@@ -23,9 +24,12 @@ import {
   readAllLogs,
   writeLogs,
   readLogs,
+  readMonthMetadata,
+  writeMonthMetadata,
   CALENDAR_ITEM_PREFIX,
   extractConfigFromItems,
-  extractLogsFromItems
+  extractLogsFromItems,
+  extractMonthMetadataFromItems
 } from '../utils/itemStorage';
 
 // Retry configuration for player sync
@@ -41,10 +45,14 @@ export const useCalendar = () => {
   const [role, setRole] = useState<'GM' | 'PLAYER'>('PLAYER');
   const [ready, setReady] = useState(false);
   const [waitingForGM, setWaitingForGM] = useState(false);
+  const [currentMonthMeta, setCurrentMonthMeta] = useState<MonthYearMetadata | null>(null);
 
   // Track previous config/logs JSON strings to detect actual changes
   const prevConfigJsonRef = useRef<string | null>(null);
   const prevLogsJsonRef = useRef<string | null>(null);
+  
+  // Track viewed month/year for month metadata loading
+  const viewedMonthRef = useRef<{ year: number; monthIndex: number } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -120,6 +128,17 @@ export const useCalendar = () => {
               if (logsChanged) {
                 setLogs(newLogs);
               }
+              
+              // Also update month metadata if we have a viewed month
+              if (viewedMonthRef.current) {
+                const newMonthMeta = extractMonthMetadataFromItems(
+                  items, 
+                  viewedMonthRef.current.year, 
+                  viewedMonthRef.current.monthIndex
+                );
+                setCurrentMonthMeta(newMonthMeta);
+              }
+              
               // Mark as ready if not already (for initial sync)
               setReady(true);
               // Clear waiting state if we receive config
@@ -179,6 +198,19 @@ export const useCalendar = () => {
             }
 
             allLogs = roomLogs;
+            
+            // After migration, clean up old room metadata to prevent future conflicts (Issue 2)
+            console.log('[Calendar] Cleaning up old room metadata...');
+            const keysToDelete: Record<string, undefined> = {};
+            keysToDelete[METADATA_KEY_CONFIG] = undefined;
+            Object.keys(roomMetadata).forEach(key => {
+              if (key.startsWith(METADATA_PREFIX_LOGS)) {
+                keysToDelete[key] = undefined;
+              }
+            });
+            await OBR.room.setMetadata(keysToDelete);
+            console.log('[Calendar] Old room metadata cleaned up!');
+            
             console.log('[Calendar] Migration complete!');
           } else {
             // No existing data, GM creates new default config
@@ -363,8 +395,31 @@ export const useCalendar = () => {
     setLogs(logs.filter(l => l.id !== logId));
   };
 
+  // --- MONTH METADATA ACTIONS ---
+  
+  /**
+   * Load month metadata for a specific month/year and update the ref for onChange tracking
+   */
+  const loadMonthMetadata = async (year: number, monthIndex: number) => {
+    viewedMonthRef.current = { year, monthIndex };
+    const meta = await readMonthMetadata(year, monthIndex);
+    setCurrentMonthMeta(meta);
+  };
+
+  /**
+   * Update month metadata for a specific month/year (GM only)
+   */
+  const updateMonthMetadata = async (year: number, monthIndex: number, metadata: MonthYearMetadata) => {
+    if (role !== 'GM') return;
+    await writeMonthMetadata(year, monthIndex, metadata);
+    // Update local state if this is the currently viewed month
+    if (viewedMonthRef.current?.year === year && viewedMonthRef.current?.monthIndex === monthIndex) {
+      setCurrentMonthMeta(metadata);
+    }
+  };
+
   return {
-    ready, role, config, logs, isGM: role === 'GM', waitingForGM,
-    actions: { updateConfig, updateTime, setExactDate, updateWeather, addLog, deleteLog }
+    ready, role, config, logs, isGM: role === 'GM', waitingForGM, currentMonthMeta,
+    actions: { updateConfig, updateTime, setExactDate, updateWeather, addLog, deleteLog, loadMonthMetadata, updateMonthMetadata }
   };
 };
