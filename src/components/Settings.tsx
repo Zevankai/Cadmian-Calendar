@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import OBR from '@owlbear-rodeo/sdk';
-import type { CalendarConfig, MonthConfig, MonthBanner, SeasonName, BiomeType, DateTimeState, CalendarLogs } from '../types';
+import type { CalendarConfig, MonthBanner, SeasonName, BiomeType, DateTimeState, CalendarLogs } from '../types';
 import { METADATA_KEY_CONFIG, METADATA_PREFIX_LOGS } from '../types';
 import { getMonthMetadataStats, formatBytes, getUsageColor, calculateDataSize, calculateUsagePercentage } from '../utils/metadataStats';
 
@@ -228,7 +228,7 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
   const addMonth = () => {
     setLocalConfig({ ...localConfig, months: [...localConfig.months, { name: 'New Month', days: 30, season: 'Spring' }] });
   };
-  const handleMonthChange = (index: number, field: keyof MonthConfig, value: string | number | SeasonName) => {
+  const handleMonthChange = (index: number, field: 'name' | 'days' | 'season', value: string | number | SeasonName) => {
     const newMonths = [...localConfig.months];
     newMonths[index] = { ...newMonths[index], [field]: value };
     setLocalConfig({ ...localConfig, months: newMonths });
@@ -555,106 +555,109 @@ export const Settings: React.FC<SettingsProps> = ({ config, logs, onSave, onCanc
                   />
                 </div>
 
-                {month.banner && (
-                  <>
-                    {/* Position X Slider */}
-                    <div style={{ marginBottom: '10px' }}>
-                      <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <span>Horizontal Position</span>
-                        <span>{month.banner.positionX}%</span>
-                      </label>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="100" 
-                        value={month.banner.positionX}
-                        onChange={(e) => handleBannerChange(idx, { ...month.banner!, positionX: parseInt(e.target.value) })}
-                        style={{ width: '100%', cursor: 'pointer' }}
-                      />
-                    </div>
-
-                    {/* Position Y Slider */}
-                    <div style={{ marginBottom: '10px' }}>
-                      <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <span>Vertical Position</span>
-                        <span>{month.banner.positionY}%</span>
-                      </label>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="100" 
-                        value={month.banner.positionY}
-                        onChange={(e) => handleBannerChange(idx, { ...month.banner!, positionY: parseInt(e.target.value) })}
-                        style={{ width: '100%', cursor: 'pointer' }}
-                      />
-                    </div>
-
-                    {/* Zoom Slider */}
-                    <div style={{ marginBottom: '10px' }}>
-                      <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <span>Zoom</span>
-                        <span>{month.banner.zoom.toFixed(1)}x</span>
-                      </label>
-                      <input 
-                        type="range" 
-                        min="0.5" 
-                        max="2" 
-                        step="0.1"
-                        value={month.banner.zoom}
-                        onChange={(e) => handleBannerChange(idx, { ...month.banner!, zoom: parseFloat(e.target.value) })}
-                        style={{ width: '100%', cursor: 'pointer' }}
-                      />
-                    </div>
-
-                    {/* Preview */}
-                    <div style={{ marginBottom: '10px' }}>
-                      <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'block', marginBottom: '4px' }}>Preview</label>
-                      <div style={{
-                        width: '100%',
-                        height: '80px',
-                        borderRadius: '8px',
-                        overflow: 'hidden',
-                        position: 'relative',
-                        border: '1px solid rgba(255, 255, 255, 0.2)'
-                      }}>
-                        <img 
-                          src={month.banner.url}
-                          alt="Banner preview"
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            objectPosition: `${month.banner.positionX}% ${month.banner.positionY}%`,
-                            transform: `scale(${month.banner.zoom})`,
-                            transformOrigin: `${month.banner.positionX}% ${month.banner.positionY}%`
-                          }}
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
+                {month.banner && (() => {
+                  const banner = month.banner;
+                  return (
+                    <>
+                      {/* Position X Slider */}
+                      <div style={{ marginBottom: '10px' }}>
+                        <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span>Horizontal Position</span>
+                          <span>{banner.positionX}%</span>
+                        </label>
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max="100" 
+                          value={banner.positionX}
+                          onChange={(e) => handleBannerChange(idx, { ...banner, positionX: parseInt(e.target.value) })}
+                          style={{ width: '100%', cursor: 'pointer' }}
                         />
-                        {/* Gradient overlay */}
-                        <div style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          height: '40%',
-                          background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)',
-                          pointerEvents: 'none'
-                        }} />
                       </div>
-                    </div>
 
-                    {/* Clear Button */}
-                    <button 
-                      onClick={() => handleBannerChange(idx, undefined)}
-                      className="btn-danger"
-                      style={{ width: '100%', padding: '8px' }}
-                    >
-                      Clear Banner
-                    </button>
-                  </>
-                )}
+                      {/* Position Y Slider */}
+                      <div style={{ marginBottom: '10px' }}>
+                        <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span>Vertical Position</span>
+                          <span>{banner.positionY}%</span>
+                        </label>
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max="100" 
+                          value={banner.positionY}
+                          onChange={(e) => handleBannerChange(idx, { ...banner, positionY: parseInt(e.target.value) })}
+                          style={{ width: '100%', cursor: 'pointer' }}
+                        />
+                      </div>
+
+                      {/* Zoom Slider */}
+                      <div style={{ marginBottom: '10px' }}>
+                        <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span>Zoom</span>
+                          <span>{banner.zoom.toFixed(1)}x</span>
+                        </label>
+                        <input 
+                          type="range" 
+                          min="0.5" 
+                          max="2" 
+                          step="0.1"
+                          value={banner.zoom}
+                          onChange={(e) => handleBannerChange(idx, { ...banner, zoom: parseFloat(e.target.value) })}
+                          style={{ width: '100%', cursor: 'pointer' }}
+                        />
+                      </div>
+
+                      {/* Preview */}
+                      <div style={{ marginBottom: '10px' }}>
+                        <label style={{ fontSize: '0.75rem', color: '#aaa', display: 'block', marginBottom: '4px' }}>Preview</label>
+                        <div style={{
+                          width: '100%',
+                          height: '80px',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          position: 'relative',
+                          border: '1px solid rgba(255, 255, 255, 0.2)'
+                        }}>
+                          <img 
+                            src={banner.url}
+                            alt="Banner preview"
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              objectPosition: `${banner.positionX}% ${banner.positionY}%`,
+                              transform: `scale(${banner.zoom})`,
+                              transformOrigin: `${banner.positionX}% ${banner.positionY}%`
+                            }}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                          {/* Gradient overlay */}
+                          <div style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            height: '40%',
+                            background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)',
+                            pointerEvents: 'none'
+                          }} />
+                        </div>
+                      </div>
+
+                      {/* Clear Button */}
+                      <button 
+                        onClick={() => handleBannerChange(idx, undefined)}
+                        className="btn-danger"
+                        style={{ width: '100%', padding: '8px' }}
+                      >
+                        Clear Banner
+                      </button>
+                    </>
+                  );
+                })()}
               </div>
             )}
           </div>
