@@ -26,10 +26,18 @@ export interface Holiday {
   day: number;
 }
 
+export interface MonthBanner {
+  url: string;                    // The image URL
+  positionX: number;              // Horizontal focal point (0-100, percentage from left)
+  positionY: number;              // Vertical focal point (0-100, percentage from top)
+  zoom: number;                   // Zoom level (1 = 100%, values > 1 zoom in)
+}
+
 export interface MonthConfig {
   name: string;
   days: number;
   season: SeasonName;
+  banner?: MonthBanner;           // Optional banner image configuration
 }
 
 export interface WeekDayConfig {
