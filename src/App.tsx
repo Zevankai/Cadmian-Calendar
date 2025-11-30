@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { useCalendar } from './hooks/useCalendar';
 import { MonthView } from './components/MonthView';
@@ -12,17 +12,31 @@ import { getThemeColors, applyTheme } from './utils/theme';
 
 function App() {
   // FIXED: Removed 'role' from this line
-  const { ready, config, logs, isGM, waitingForGM, actions } = useCalendar();
+  const { ready, config, logs, isGM, waitingForGM, currentMonthMeta, actions } = useCalendar();
 
   const [viewDate, setViewDate] = useState<DateTimeState | null>(null);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
   const [activeTab, setActiveTab] = useState<'calendar' | 'settings'>('calendar');
+  
+  // Track previous viewDate to detect changes for month metadata loading
+  const prevViewDateRef = useRef<{ year: number; monthIndex: number } | null>(null);
 
   useEffect(() => {
     if (config && !viewDate) {
       setViewDate(config.currentDate);
     }
   }, [config, viewDate]);
+
+  // Load month metadata when viewed month/year changes
+  useEffect(() => {
+    if (viewDate) {
+      const prev = prevViewDateRef.current;
+      if (!prev || prev.year !== viewDate.year || prev.monthIndex !== viewDate.monthIndex) {
+        prevViewDateRef.current = { year: viewDate.year, monthIndex: viewDate.monthIndex };
+        actions.loadMonthMetadata(viewDate.year, viewDate.monthIndex);
+      }
+    }
+  }, [viewDate, actions]);
 
   // Apply dynamic theme based on biome and season
   useEffect(() => {
@@ -69,10 +83,13 @@ function App() {
       <Settings
         config={config}
         logs={logs}
+        viewDate={viewDate}
+        currentMonthMeta={currentMonthMeta}
         onSave={(newConfig) => {
             actions.updateConfig(newConfig);
             setActiveTab('calendar');
         }}
+        onUpdateMonthMetadata={actions.updateMonthMetadata}
         onCancel={() => setActiveTab('calendar')}
       />
     );
@@ -103,6 +120,7 @@ function App() {
               config={config} 
               logs={logs}
               viewDate={viewDate}
+              monthMetadata={currentMonthMeta}
               onSelectDay={(day) => {
                 setViewDate({ ...viewDate, day });
                 setIsCreatingNote(false); 

@@ -1,6 +1,6 @@
 import OBR, { buildImage } from '@owlbear-rodeo/sdk';
 import type { Item } from '@owlbear-rodeo/sdk';
-import type { CalendarConfig, CalendarLogs } from '../types';
+import type { CalendarConfig, CalendarLogs, MonthYearMetadata } from '../types';
 
 /**
  * Item IDs for calendar storage
@@ -18,6 +18,7 @@ export const CALENDAR_ITEM_PREFIX = 'com.username.calendar-';
  */
 const ITEM_METADATA_KEY_CONFIG = 'calendar.config';
 const ITEM_METADATA_KEY_LOGS = 'calendar.logs';
+const ITEM_METADATA_KEY_MONTH_META = 'calendar.monthMeta';
 
 /**
  * Get the item ID for a specific month/year logs bucket
@@ -156,6 +157,36 @@ export async function writeLogs(year: number, monthIndex: number, logs: Calendar
 }
 
 /**
+ * Read month/year-specific metadata from item metadata (read-only, doesn't create items)
+ */
+export async function readMonthMetadata(year: number, monthIndex: number): Promise<MonthYearMetadata | null> {
+  try {
+    const item = await getLogsItem(year, monthIndex);
+    if (!item) {
+      return null;
+    }
+    const metadata = item.metadata;
+    return (metadata[ITEM_METADATA_KEY_MONTH_META] as MonthYearMetadata) || null;
+  } catch (error) {
+    console.error(`Error reading month metadata for ${year}-${monthIndex}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Write month/year-specific metadata to item metadata
+ */
+export async function writeMonthMetadata(year: number, monthIndex: number, monthMeta: MonthYearMetadata): Promise<void> {
+  const item = await getOrCreateLogsItem(year, monthIndex);
+
+  await OBR.scene.items.updateItems([item.id], (items) => {
+    items.forEach(item => {
+      item.metadata[ITEM_METADATA_KEY_MONTH_META] = monthMeta;
+    });
+  });
+}
+
+/**
  * Get all calendar log items (for reading all events)
  */
 export async function getAllLogsItems(): Promise<Item[]> {
@@ -223,4 +254,18 @@ export function extractLogsFromItems(items: Item[]): CalendarLogs {
   }
 
   return allLogs;
+}
+
+/**
+ * Extract month/year-specific metadata from an array of items (for use in onChange callback)
+ * This avoids race conditions by reading from the items passed to the callback
+ * rather than making separate API calls.
+ */
+export function extractMonthMetadataFromItems(items: Item[], year: number, monthIndex: number): MonthYearMetadata | null {
+  const itemId = getLogsItemId(year, monthIndex);
+  const monthItem = items.find(item => item.id === itemId);
+  if (!monthItem) {
+    return null;
+  }
+  return (monthItem.metadata[ITEM_METADATA_KEY_MONTH_META] as MonthYearMetadata) || null;
 }

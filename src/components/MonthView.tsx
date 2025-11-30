@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { CalendarConfig, DateTimeState, CalendarLog, EventCategory } from '../types';
+import type { CalendarConfig, DateTimeState, CalendarLog, EventCategory, MonthYearMetadata } from '../types';
 import { getFirstDayOfWeekIndex } from '../utils/calendarMath';
 import styles from './MonthView.module.css';
 import classNames from 'classnames';
@@ -8,6 +8,7 @@ interface MonthViewProps {
   config: CalendarConfig;
   viewDate: DateTimeState;
   logs: CalendarLog[]; // We now accept logs to render dots
+  monthMetadata: MonthYearMetadata | null; // Month/year-specific metadata including banner
   onSelectDay: (day: number) => void;
   onNavigateMonth: (direction: -1 | 1) => void;
 }
@@ -22,10 +23,13 @@ const CAT_COLORS: Record<EventCategory, string> = {
 };
 
 export const MonthView: React.FC<MonthViewProps> = ({ 
-  config, viewDate, logs, onSelectDay, onNavigateMonth
+  config, viewDate, logs, monthMetadata, onSelectDay, onNavigateMonth
 }) => {
   const currentMonthConfig = config.months[viewDate.monthIndex];
   const weekLength = config.weekDays.length || 7;
+  
+  // Get banner from month/year-specific metadata
+  const banner = monthMetadata?.banner;
 
   const startOffset = useMemo(() => {
     return getFirstDayOfWeekIndex(config, viewDate.year, viewDate.monthIndex);
@@ -79,16 +83,16 @@ export const MonthView: React.FC<MonthViewProps> = ({
   return (
     <div className={styles.container}>
       {/* Banner Image */}
-      {currentMonthConfig.banner && currentMonthConfig.banner.url && (
+      {banner && banner.url && (
         <div className={styles.bannerContainer}>
           <img 
-            src={currentMonthConfig.banner.url}
-            alt={`${currentMonthConfig.name} banner`}
+            src={banner.url}
+            alt={`${currentMonthConfig.name} ${viewDate.year} banner`}
             className={styles.bannerImage}
             style={{
-              objectPosition: `${currentMonthConfig.banner.positionX}% ${currentMonthConfig.banner.positionY}%`,
-              transform: `scale(${currentMonthConfig.banner.zoom})`,
-              transformOrigin: `${currentMonthConfig.banner.positionX}% ${currentMonthConfig.banner.positionY}%`
+              objectPosition: `${banner.positionX}% ${banner.positionY}%`,
+              transform: `scale(${banner.zoom})`,
+              transformOrigin: `${banner.positionX}% ${banner.positionY}%`
             }}
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
