@@ -78,6 +78,26 @@ export const MonthView: React.FC<MonthViewProps> = ({
 
   return (
     <div className={styles.container}>
+      {/* Banner Image */}
+      {currentMonthConfig.banner && currentMonthConfig.banner.url && (
+        <div className={styles.bannerContainer}>
+          <img 
+            src={currentMonthConfig.banner.url}
+            alt={`${currentMonthConfig.name} banner`}
+            className={styles.bannerImage}
+            style={{
+              objectPosition: `${currentMonthConfig.banner.positionX}% ${currentMonthConfig.banner.positionY}%`,
+              transform: `scale(${currentMonthConfig.banner.zoom})`,
+              transformOrigin: `${currentMonthConfig.banner.positionX}% ${currentMonthConfig.banner.positionY}%`
+            }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+          <div className={styles.bannerOverlay} />
+        </div>
+      )}
+      
       <div className={styles.header}>
         <button className={styles.navButton} onClick={() => onNavigateMonth(-1)}>&lt;</button>
         <span>{currentMonthConfig.name} {viewDate.year}</span>
